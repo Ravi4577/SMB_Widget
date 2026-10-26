@@ -235,9 +235,23 @@
     ZOHO.embeddedApp.on("PageLoad", function (data) {
       state.pageData = data || {};
       log("PageLoad", state.pageData);
+      resizePopup();
       loadEverything();
     });
     ZOHO.embeddedApp.init();
+  }
+
+  // Enlarge the CRM popup. Only applies to popup placements; ignored elsewhere.
+  function resizePopup() {
+    var ui = CONFIG.ui || {};
+    if (!ui.resize || !ZOHO.CRM || !ZOHO.CRM.UI || typeof ZOHO.CRM.UI.Resize !== "function") return;
+    var f = ui.screenFraction || 0.95;
+    var w = Math.round(Math.min(ui.width, (window.screen.availWidth || ui.width) * f));
+    var h = Math.round(Math.min(ui.height, (window.screen.availHeight || ui.height) * f));
+    try {
+      Promise.resolve(ZOHO.CRM.UI.Resize({ width: String(w), height: String(h) }))
+        .catch(function (e) { log("resize failed", e); });
+    } catch (e) { log("resize failed", e); }
   }
 
   function loadEverything() {
@@ -609,12 +623,7 @@
     if (state.configErrors.length) {
       addBanner("error", "<strong>Configuration required – saving is disabled.</strong><ul><li>" + state.configErrors.map(esc).join("</li><li>") + "</li></ul>", { id: "cfg-errors", html: true });
     }
-    if (state.configWarnings.length) {
-      addBanner("warn", "<ul><li>" + state.configWarnings.map(esc).join("</li><li>") + "</li></ul>", { id: "cfg-warnings", html: true, dismissible: true });
-    }
-    if (state.duplicates.length) {
-      addBanner("warn", "Duplicate CRM records found for task(s) " + esc(state.duplicates.join(", ")) + ". The most recently modified record is shown and updated.", { id: "cfg-dupes", html: true, dismissible: true });
-    }
+    // Non-blocking warnings and duplicates are listed in the diagnostics panel only.
     renderHeader();
   }
 
@@ -625,6 +634,8 @@
     row("Module API name", state.moduleApi ? "<code>" + esc(state.moduleApi) + "</code> <span class='warn-text'>(" + esc(state.moduleSource) + ")</span>" : "<span class='err-text'>not resolved</span>");
     row("Opened from", pd.Entity ? "<code>" + esc(pd.Entity) + "</code> / <code>" + esc(first(pd.EntityId) || "—") + "</code>" : "Web tab / no record context");
     row("Transaction link", "<code>" + esc(state.txn.mode) + "</code>" + (state.txn.parentId ? " → " + esc(state.txn.parentModule) + " <code>" + esc(state.txn.parentId) + "</code>" : ""));
+    if (state.configWarnings.length) row("Warnings", "<span class='warn-text'>" + state.configWarnings.map(esc).join("<br>") + "</span>");
+    if (state.duplicates.length) row("Duplicate records", "<span class='warn-text'>Task(s) " + esc(state.duplicates.join(", ")) + " have more than one CRM record; the most recently modified one is shown and updated.</span>");
 
     var fieldList = [];
     Object.keys(F).forEach(function (k) { fieldList.push(F[k]); });

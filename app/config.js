@@ -151,6 +151,18 @@
       completeStatus: "Complete"
     },
 
+    /* ------------------------------------------------------------------
+     * Popup size (button / popup placements). The widget asks CRM to resize
+     * its popup to this size, capped to the user's screen. Set resize to
+     * false to keep the size configured in CRM.
+     * ------------------------------------------------------------------ */
+    ui: {
+      resize: true,
+      width: 1500,
+      height: 850,
+      screenFraction: 0.95
+    },
+
     api: {
       batchSize: 100, // Zoho CRM insert/update limit per call
       pageSize: 200,
