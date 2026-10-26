@@ -125,10 +125,11 @@
      * number, checkbox). Lookup / read-only fields are shown, not edited.
      * ------------------------------------------------------------------ */
     header: {
-      sellerName:  { field: "", labels: ["Seller / Practice Name", "Seller Name", "Practice Name", "Seller"] },
-      buyerName:   { field: "", labels: ["Buyer / Company Name", "Buyer Name", "Buyer Company Name", "Buyer Company", "Buyer"] },
-      closingDate: { field: "", labels: ["Closing Date"] },
-      location:    { field: "", labels: ["Location"] }
+      // Deals API names confirmed by the client (2026-10-26).
+      sellerName:  { field: "Seller",       labels: ["Seller / Practice Name", "Seller Name", "Practice Name", "Seller"] },
+      buyerName:   { field: "Buyer",        labels: ["Buyer / Company Name", "Buyer Name", "Buyer Company Name", "Buyer Company", "Buyer"] },
+      closingDate: { field: "Closing_Date", labels: ["Closing Date"] },
+      location:    { field: "Location",     labels: ["Location"] }
     },
 
     /* ------------------------------------------------------------------

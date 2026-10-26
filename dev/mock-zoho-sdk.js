@@ -43,10 +43,10 @@
     return m;
   });
 
-  // Parent Deal: Seller (text), Buyer (lookup -> read-only), Closing Date (date), Location (text)
+  // Parent Deal: Seller (text), Buyer (text), Closing Date (date), Location (text)
   var DEAL_FIELDS = [
-    { api_name: "Seller_Name", field_label: "Seller Name", data_type: "text", length: 255 },
-    { api_name: "Buyer_Company", field_label: "Buyer Company", data_type: "lookup" },
+    { api_name: "Seller", field_label: "Seller Name", data_type: "text", length: 255 },
+    { api_name: "Buyer", field_label: "Buyer", data_type: "text", length: 255 },
     { api_name: "Closing_Date", field_label: "Closing Date", data_type: "date" },
     { api_name: "Location", field_label: "Location", data_type: "text", length: 255 }
   ];
@@ -122,7 +122,7 @@
         getRecord: function (cfg) {
           if (cfg.Entity === "Deals") {
             var db = load();
-            db.deal = db.deal || { Seller_Name: "Smith Family Dental", Buyer_Company: { id: "9", name: "Bright Smiles Holdings" }, Closing_Date: "2026-12-15", Location: null };
+            db.deal = db.deal || { Seller: "Smith Family Dental", Buyer: "Bright Smiles Holdings", Closing_Date: "2026-12-15", Location: null };
             save(db);
             return delay({ data: [Object.assign({ id: cfg.RecordID }, clone(db.deal))] });
           }
