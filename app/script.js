@@ -245,9 +245,8 @@
   function resizePopup() {
     var ui = CONFIG.ui || {};
     if (!ui.resize || !ZOHO.CRM || !ZOHO.CRM.UI || typeof ZOHO.CRM.UI.Resize !== "function") return;
-    var f = ui.screenFraction || 0.95;
-    var w = Math.round(Math.min(ui.width, (window.screen.availWidth || ui.width) * f));
-    var h = Math.round(Math.min(ui.height, (window.screen.availHeight || ui.height) * f));
+    var w = Math.round(Math.min(ui.width, (window.screen.availWidth || 1400) - (ui.marginX || 0)));
+    var h = Math.round(Math.min(ui.height, (window.screen.availHeight || 900) - (ui.marginY || 0)));
     try {
       Promise.resolve(ZOHO.CRM.UI.Resize({ width: String(w), height: String(h) }))
         .catch(function (e) { log("resize failed", e); });
@@ -659,7 +658,14 @@
       : "0");
     row("Record naming", "<code>" + esc(state.moduleApi ? recordName(state.tasks["1.3.3"]) : "") + "</code> (example for 1.3.3)");
     if (CONFIG.debug.simulateFailureRate > 0) row("Debug", "<span class='err-text'>simulateFailureRate = " + CONFIG.debug.simulateFailureRate + "</span>");
-    $("diagBody").innerHTML = "<table>" + rows.join("") + "</table>";
+    // The panel is not shown in the widget; diagnostics go to the browser console.
+    var box = $("diagBody");
+    if (box) { box.innerHTML = "<table>" + rows.join("") + "</table>"; return; }
+    var tmp = document.createElement("div");
+    tmp.innerHTML = "<table>" + rows.join("") + "</table>";
+    log("diagnostics\n" + Array.prototype.map.call(tmp.querySelectorAll("tr"), function (tr) {
+      return tr.cells[0].textContent + ": " + tr.cells[1].innerText.replace(/\n/g, " | ");
+    }).join("\n"));
   }
 
   /* ==================================================================

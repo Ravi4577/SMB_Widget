@@ -158,9 +158,10 @@
      * ------------------------------------------------------------------ */
     ui: {
       resize: true,
-      width: 1500,
-      height: 850,
-      screenFraction: 0.95
+      width: 10000,        // no fixed cap: the popup fills the screen minus the margins below
+      height: 10000,
+      marginX: 60,         // px left free for the CRM page edges
+      marginY: 170         // px left free for browser toolbar + popup title bar
     },
 
     api: {
