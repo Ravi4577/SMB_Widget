@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMB Transaction Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <!-- Title + toolbar -->
+    <header class="topbar">
+      <h1 class="title">SMB TRANSACTION TRACKER</h1>
+      <div class="toolbar">
+        <span id="dirtyBadge" class="dirty-badge" hidden>0 unsaved</span>
+        <button type="button" id="btnExpandAll" class="btn btn-ghost">Expand All</button>
+        <button type="button" id="btnCollapseAll" class="btn btn-ghost">Collapse All</button>
+        <button type="button" id="btnRefresh" class="btn btn-secondary">Refresh</button>
+        <button type="button" id="btnSave" class="btn btn-primary" disabled>Save Changes</button>
+      </div>
+    </header>
+
+    <!-- Banners (config warnings, save results) -->
+    <div id="banners" class="banners" aria-live="polite"></div>
+
+    <!-- Transaction header -->
+    <section class="txn-header" aria-label="Transaction details">
+      <div class="txn-cell"><span class="txn-label">SELLER / PRACTICE NAME</span><span class="txn-value" id="hdrSeller">—</span></div>
+      <div class="txn-cell"><span class="txn-label">CLOSING DATE</span><span class="txn-value" id="hdrClosing">—</span></div>
+      <div class="txn-cell"><span class="txn-label">BUYER / COMPANY NAME</span><span class="txn-value" id="hdrBuyer">—</span></div>
+      <div class="txn-cell"><span class="txn-label">LOCATION</span><span class="txn-value" id="hdrLocation">—</span></div>
+    </section>
+
+    <!-- Checklist -->
+    <div class="sheet-wrap" id="sheetWrap">
+      <table class="sheet" id="sheet">
+        <colgroup>
+          <col class="c-code"><col class="c-item"><col class="c-owner"><col class="c-status">
+          <col class="c-date"><col class="c-date"><col class="c-risk"><col class="c-details">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="th-code"></th>
+            <th>PHASE / ITEM</th>
+            <th>OWNER</th>
+            <th>STATUS</th>
+            <th>DUE DATE</th>
+            <th>COMPLETED DATE</th>
+            <th>AT RISK?</th>
+            <th>TASK DETAILS</th>
+          </tr>
+        </thead>
+        <tbody id="sheetBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Configuration / diagnostics -->
+    <details class="diag" id="diag">
+      <summary>Configuration &amp; diagnostics</summary>
+      <div id="diagBody" class="diag-body">Loading…</div>
+    </details>
+
+    <!-- Loading overlay -->
+    <div id="loader" class="loader" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <div id="loaderText" class="loader-text">Loading…</div>
+    </div>
+
+    <!-- Confirm dialog (window.confirm is not reliable inside the CRM iframe) -->
+    <div id="dialog" class="dialog-backdrop" hidden>
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogMsg">
+        <p id="dialogMsg"></p>
+        <div class="dialog-actions">
+          <button type="button" id="dialogNo" class="btn btn-ghost">No</button>
+          <button type="button" id="dialogYes" class="btn btn-primary">Yes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zoho CRM Embedded App SDK -->
+  <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

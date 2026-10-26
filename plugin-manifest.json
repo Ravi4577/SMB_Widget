@@ -1,0 +1,8 @@
+{
+  "locale": ["en"],
+  "service": "CRM",
+  "storage": false,
+  "whiteListedDomains": [],
+  "modules": {},
+  "config": []
+}

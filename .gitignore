@@ -1,0 +1,5 @@
+.claude/
+dist/_stage/
+.vscode/
+node_modules/
+*.log
