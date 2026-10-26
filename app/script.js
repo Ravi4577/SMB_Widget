@@ -557,7 +557,7 @@
       '<td><input type="date" data-key="dueDate" aria-label="Due date" value="' + esc(v.dueDate) + '" class="' + inv(t, "dueDate") + '"></td>' +
       '<td><input type="date" data-key="completeDate" aria-label="Completed date" value="' + esc(v.completeDate) + '" class="' + inv(t, "completeDate") + '"></td>' +
       '<td><select data-key="atRisk" aria-label="At risk" class="' + (v.atRisk ? "" : "placeholder") + (v.atRisk === "Yes" ? " risk-yes" : "") + inv(t, "atRisk") + '">' + optionsHtml(CONFIG.options.atRisk, v.atRisk, "—") + '</select></td>' +
-      '<td><textarea data-key="taskDetails" aria-label="Task details" rows="1" maxlength="' + CONFIG.validation.taskDetailsMaxLength + '" placeholder="' + esc(t.hint) + '" class="' + inv(t, "taskDetails") + '">' + esc(v.taskDetails) + '</textarea></td>' +
+      '<td><textarea data-key="taskDetails" aria-label="Task details" rows="1" maxlength="' + CONFIG.validation.taskDetailsMaxLength + '" class="' + inv(t, "taskDetails") + '">' + esc(v.taskDetails) + '</textarea></td>' +
     '</tr>';
   }
 
