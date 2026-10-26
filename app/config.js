@@ -114,15 +114,21 @@
     },
 
     /* ------------------------------------------------------------------
-     * Transaction header. Values are read from the parent record (the
-     * record the widget was opened from). Leave a field empty when no CRM
-     * field has been confirmed – it is then shown as "Not mapped".
+     * Transaction header. Values are read from, and saved back to, the
+     * parent record (the record the widget was opened from, e.g. a Deal).
+     *
+     * field:  exact API name on the parent module (VERIFY). When empty, the
+     *         widget looks for a field whose label matches one of `labels`
+     *         in that module's real field list (getFields) – nothing is
+     *         guessed without that check.
+     * The input type follows the CRM field type (text, date, picklist,
+     * number, checkbox). Lookup / read-only fields are shown, not edited.
      * ------------------------------------------------------------------ */
     header: {
-      sellerName: "",  // VERIFY: parent-record field API name
-      buyerName: "",   // VERIFY
-      closingDate: "", // VERIFY
-      location: ""     // VERIFY
+      sellerName:  { field: "", labels: ["Seller / Practice Name", "Seller Name", "Practice Name", "Seller"] },
+      buyerName:   { field: "", labels: ["Buyer / Company Name", "Buyer Name", "Buyer Company Name", "Buyer Company", "Buyer"] },
+      closingDate: { field: "", labels: ["Closing Date"] },
+      location:    { field: "", labels: ["Location"] }
     },
 
     /* ------------------------------------------------------------------

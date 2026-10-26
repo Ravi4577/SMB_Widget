@@ -43,8 +43,23 @@
     return m;
   });
 
+  // Parent Deal: Seller (text), Buyer (lookup -> read-only), Closing Date (date), Location (text)
+  var DEAL_FIELDS = [
+    { api_name: "Seller_Name", field_label: "Seller Name", data_type: "text", length: 255 },
+    { api_name: "Buyer_Company", field_label: "Buyer Company", data_type: "lookup" },
+    { api_name: "Closing_Date", field_label: "Closing Date", data_type: "date" },
+    { api_name: "Location", field_label: "Location", data_type: "text", length: 255 }
+  ];
+
   function write(isNew, cfg) {
     var data = cfg.APIData;
+    if (cfg.Entity === "Deals") {
+      if (Math.random() < failRate) return delay({ data: [{ code: "INTERNAL_ERROR", status: "error", message: "Mock API failure", details: {} }] });
+      var d = load();
+      Object.keys(data).forEach(function (k) { if (k !== "id") d.deal[k] = data[k]; });
+      save(d);
+      return delay({ data: [{ code: "SUCCESS", status: "success", message: "record updated", details: { id: data.id } }] });
+    }
     if (Math.random() < failRate) return delay({ data: [{ code: "INTERNAL_ERROR", status: "error", message: "Mock API failure", details: {} }] });
     var db = load();
     if (isNew) {
@@ -87,7 +102,10 @@
       },
       META: {
         getModules: function () { return delay({ modules: [{ api_name: MODULE, plural_label: "SMB Transaction Tracker", singular_label: "SMB Transaction Tracker", module_name: "SMB_Transaction_Tracker" }, { api_name: "Deals", plural_label: "Deals", singular_label: "Deal" }] }); },
-        getFields: function () { return delay({ fields: clone(FIELDS) }); }
+        getFields: function (cfg) {
+          if (cfg && cfg.Entity === "Deals") return delay({ fields: clone(DEAL_FIELDS) });
+          return delay({ fields: clone(FIELDS) });
+        }
       },
       API: {
         getAllRecords: function (cfg) { return page(load().records, cfg); },
@@ -102,7 +120,12 @@
           return page(rows, cfg);
         },
         getRecord: function (cfg) {
-          if (cfg.Entity === "Deals") return delay({ data: [{ id: cfg.RecordID, Deal_Name: "Smith Family Dental", Account_Name: { id: "9", name: "Bright Smiles Holdings" }, Closing_Date: "2026-12-15", Location: "Phoenix, AZ" }] });
+          if (cfg.Entity === "Deals") {
+            var db = load();
+            db.deal = db.deal || { Seller_Name: "Smith Family Dental", Buyer_Company: { id: "9", name: "Bright Smiles Holdings" }, Closing_Date: "2026-12-15", Location: null };
+            save(db);
+            return delay({ data: [Object.assign({ id: cfg.RecordID }, clone(db.deal))] });
+          }
           var r = load().records.filter(function (x) { return x.id === String(cfg.RecordID); })[0];
           return delay(r ? { data: [clone(r)] } : {});
         },
@@ -114,7 +137,6 @@
   // &link=name_prefix|lookup  – try the linking modes without editing config.js
   if (qs.get("link") && window.SMB_CONFIG) {
     window.SMB_CONFIG.transactionLink = { mode: qs.get("link"), parentModule: "Deals", lookupField: "Deal" };
-    window.SMB_CONFIG.header = { sellerName: "Deal_Name", buyerName: "Account_Name", closingDate: "Closing_Date", location: "Location" };
     FIELDS.push({ api_name: "Deal", data_type: "lookup" });
   }
   console.info("[mock] Zoho SDK mock active", { failRate: failRate });

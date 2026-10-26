@@ -30,12 +30,15 @@ Choose one and set `CONFIG.transactionLink`:
 > Changing the mode after records exist changes how records are found. For example, `none` records named `SMB-LOI-1.1` are not found by `name_prefix`. Decide before entering real data.
 
 ## 4. Header fields (Seller, Buyer, Closing Date, Location)
-These are read from the **parent record** (`transactionLink.parentModule`, or the record the widget was opened from). Until they're mapped, they show "Not mapped".
+These fields are read from, and saved back to, the **parent record**: the record the widget was opened from (for example the Deal), or `transactionLink.parentModule`. Each box uses the input that matches the CRM field's type: text, date picker, dropdown, number or checkbox. Lookup fields and read-only fields are shown but can't be edited here. Your changes are saved when you click **Save Changes**.
 
-- [ ] `CONFIG.header.sellerName` = API name of the seller/practice field on the parent module
-- [ ] `CONFIG.header.buyerName`
-- [ ] `CONFIG.header.closingDate`
-- [ ] `CONFIG.header.location`
+How the widget finds each field:
+- If `CONFIG.header.<key>.field` contains an API name, it uses that field.
+- If it's empty, it looks for a field on the parent module whose **label** matches one of `labels`. It only matches against that module's real field list, so it never invents a field.
+- If no field is found, the box is greyed out. Hover over it to see why.
+
+- [ ] Set `field` for `sellerName`, `buyerName`, `closingDate` and `location` to the parent module's API names. This is safer than relying on label matching.
+- [ ] Users need edit permission on those fields of the parent record.
 
 ## 5. Existing picklists
 `Phase_Item, Escrow_Account, Escrow_Account_Sub_Item, Letter_of_intent_Subitem, Under_Contract_Sub_Item`

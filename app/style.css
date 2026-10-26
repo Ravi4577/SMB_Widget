@@ -139,8 +139,23 @@ html, body {
   font-size: 12px;
   color: var(--brand);
 }
-.txn-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.txn-value.unmapped { color: var(--muted); font-style: italic; }
+.txn-value { flex: 1; min-width: 0; display: flex; align-items: center; border-radius: 4px; }
+.txn-value.is-dirty { background: var(--dirty); box-shadow: inset 3px 0 0 var(--dirty-edge); }
+.hdr-input {
+  width: 100%;
+  font: 13px var(--font);
+  color: var(--text);
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  padding: 5px 8px;
+  outline: none;
+}
+.hdr-input:hover:not(:disabled) { border-color: var(--grid); background: #fff; }
+.hdr-input:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 2px rgba(11,83,148,.12); }
+.hdr-input:disabled { cursor: not-allowed; }
+input[type="checkbox"].hdr-input { width: auto; }
+.hdr-readonly { padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Sheet ---------- */
 .sheet-wrap {

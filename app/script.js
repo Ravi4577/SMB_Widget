@@ -25,6 +25,8 @@
     completeDate: "Completed Date", atRisk: "At Risk?", taskDetails: "Task Details"
   };
   var WRITE_CONCURRENCY = 4;
+  // [config key, element id] for the transaction header.
+  var HEADER_KEYS = [["sellerName", "hdrSeller"], ["closingDate", "hdrClosing"], ["buyerName", "hdrBuyer"], ["location", "hdrLocation"]];
 
   /* ==================================================================
    * State
@@ -43,7 +45,7 @@
     configErrors: [],   // blocking problems: saving disabled
     configWarnings: [],
     txn: { mode: CONFIG.transactionLink.mode, parentId: null, parentModule: CONFIG.transactionLink.parentModule },
-    headerRecord: null,
+    header: { entity: null, id: null, keys: {} }, // transaction header (parent record)
     unrecognized: [],
     duplicates: [],
     loaded: false,
@@ -366,21 +368,114 @@
   }
 
   function loadHeader() {
-    var hdr = CONFIG.header;
-    var anyMapped = Object.keys(hdr).some(function (k) { return hdr[k]; });
-    state.headerRecord = null;
-    if (!anyMapped) return Promise.resolve();
+    var h = { entity: null, id: null, keys: {} };
+    state.header = h;
+    HEADER_KEYS.forEach(function (k) { h.keys[k[0]] = { meta: null, reason: "Open the widget from a record to edit this field" }; });
 
-    var entity, id;
     if (state.txn.parentId && state.txn.parentModule) {
-      entity = state.txn.parentModule; id = state.txn.parentId;
+      h.entity = state.txn.parentModule; h.id = state.txn.parentId;
     } else if (state.pageData && state.pageData.Entity && state.pageData.Entity !== state.moduleApi && first(state.pageData.EntityId)) {
-      entity = state.pageData.Entity; id = first(state.pageData.EntityId);
+      h.entity = state.pageData.Entity; h.id = String(first(state.pageData.EntityId));
     }
-    if (!entity) return Promise.resolve();
-    return CRM.getRecord(entity, id).then(function (rec) { state.headerRecord = rec; })
-      .catch(function (e) { state.configWarnings.push("Could not load header record: " + errMsg(e)); });
+    if (!h.entity) return Promise.resolve();
+
+    return Promise.all([CRM.getRecord(h.entity, h.id), CRM.getFields(h.entity)]).then(function (res) {
+      var rec = res[0];
+      var byApi = {};
+      res[1].forEach(function (f) { byApi[f.api_name] = f; });
+      HEADER_KEYS.forEach(function (pair) {
+        var key = pair[0];
+        var cfg = CONFIG.header[key] || {};
+        var meta = null;
+        if (cfg.field) {
+          meta = byApi[cfg.field] || null;
+        } else {
+          var wanted = (cfg.labels || []).map(norm);
+          for (var i = 0; i < wanted.length && !meta; i++) {
+            meta = res[1].filter(function (f) { return norm(f.field_label) === wanted[i]; })[0] || null;
+          }
+        }
+        if (!meta) {
+          h.keys[key] = { meta: null, reason: "No matching field in " + h.entity + " – set CONFIG.header." + key + ".field in config.js" };
+          state.configWarnings.push("Header \"" + key + "\": no field found in " + h.entity + (cfg.field ? " (" + cfg.field + ")" : " by label") + ".");
+          return;
+        }
+        var kind = headerKind(meta);
+        var val = toHeaderValue(rec[meta.api_name], kind);
+        h.keys[key] = { meta: meta, kind: kind, original: val, current: val, display: displayValue(rec[meta.api_name]) };
+      });
+    }).catch(function (e) {
+      state.configWarnings.push("Could not load header record: " + errMsg(e));
+    });
   }
+
+  // Input kind for a CRM field: text | date | picklist | number | boolean | readonly
+  function headerKind(meta) {
+    if (meta.read_only || meta.field_read_only) return "readonly";
+    switch (meta.data_type) {
+      case "text": case "textarea": case "email": case "phone": case "website": return "text";
+      case "date": return "date";
+      case "picklist": return "picklist";
+      case "integer": case "bigint": case "double": case "currency": case "decimal": case "percent": return "number";
+      case "boolean": return "boolean";
+      default: return "readonly"; // lookup, ownerlookup, datetime, multiselect, autonumber, formula…
+    }
+  }
+
+  function toHeaderValue(v, kind) {
+    if (kind === "boolean") return v === true ? "true" : "false";
+    if (v == null) return "";
+    if (kind === "date") return String(v).slice(0, 10);
+    return String(v);
+  }
+
+  function displayValue(v) {
+    if (v == null || v === "") return "";
+    if (typeof v === "object") return v.name || v.display_value || v.id || "";
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return formatDate(v);
+    return String(v);
+  }
+
+  function headerDirtyKeys() {
+    return HEADER_KEYS.map(function (p) { return p[0]; }).filter(function (k) {
+      var f = state.header.keys[k];
+      return f && f.meta && f.kind !== "readonly" && f.current !== f.original;
+    });
+  }
+
+  function toCrmHeaderValue(f) {
+    if (f.kind === "boolean") return f.current === "true";
+    if (f.current === "") return null;
+    if (f.kind === "number") return Number(f.current);
+    return f.current;
+  }
+
+  function validateHeader() {
+    var errs = [];
+    headerDirtyKeys().forEach(function (k) {
+      var f = state.header.keys[k];
+      if (f.kind === "date" && f.current && !isIsoDate(f.current)) errs.push(f.meta.field_label + " must be a valid date");
+      if (f.kind === "number" && f.current !== "" && !isFinite(Number(f.current))) errs.push(f.meta.field_label + " must be a number");
+      if (f.meta.length && f.kind === "text" && f.current.length > f.meta.length) errs.push(f.meta.field_label + " is longer than " + f.meta.length + " characters");
+    });
+    return errs;
+  }
+
+  function saveHeader() {
+    var keys = headerDirtyKeys();
+    if (!keys.length) return Promise.resolve(null);
+    var errs = validateHeader();
+    if (errs.length) return Promise.resolve({ ok: false, message: errs.join("; ") });
+    var data = { id: state.header.id };
+    keys.forEach(function (k) { var f = state.header.keys[k]; data[f.meta.api_name] = toCrmHeaderValue(f); });
+    log("update header", state.header.entity, data);
+    return CRM.update(state.header.entity, data).then(function (r) {
+      if (r.ok) keys.forEach(function (k) { var f = state.header.keys[k]; f.original = f.current; });
+      return r;
+    }, function (e) { return { ok: false, message: errMsg(e) }; });
+  }
+
+  function totalDirty() { return dirtyTasks().length + headerDirtyKeys().length; }
 
   function fetchTaskRecords() {
     var link = CONFIG.transactionLink;
@@ -583,7 +678,7 @@
   }
 
   function updateToolbar() {
-    var n = dirtyTasks().length;
+    var n = totalDirty();
     var badge = $("dirtyBadge");
     badge.hidden = n === 0;
     badge.textContent = n + " unsaved change" + (n === 1 ? "" : "s");
@@ -591,28 +686,44 @@
     $("btnRefresh").disabled = state.saving;
   }
 
-  function renderHeaderValue(elId, fieldApi) {
-    var el = $(elId);
-    el.classList.remove("unmapped");
-    if (!fieldApi) {
-      el.textContent = "Not mapped";
-      el.classList.add("unmapped");
-      el.title = "No CRM field confirmed yet – set CONFIG.header in config.js";
-      return;
-    }
-    var rec = state.headerRecord;
-    var v = rec ? rec[fieldApi] : null;
-    if (v && typeof v === "object") v = v.name || v.display_value || v.id;
-    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) v = formatDate(v);
-    el.textContent = v == null || v === "" ? "—" : String(v);
-    el.title = fieldApi;
+  // Renders an input matching the CRM field type of each header field.
+  function renderHeader() {
+    HEADER_KEYS.forEach(function (pair) {
+      var key = pair[0];
+      var el = $(pair[1]);
+      var f = state.header.keys[key] || {};
+      var attrs = ' data-hkey="' + key + '" class="hdr-input"';
+      var html;
+      if (!f.meta) {
+        html = '<input type="text" disabled' + attrs + ' title="' + esc(f.reason || "") + '">';
+      } else if (f.kind === "readonly") {
+        html = '<span class="hdr-readonly" title="' + esc(f.meta.field_label + " (" + f.meta.api_name + ") – read-only here") + '">' + esc(f.display) + "</span>";
+      } else if (f.kind === "date") {
+        html = '<input type="date"' + attrs + ' value="' + esc(f.current) + '">';
+      } else if (f.kind === "number") {
+        html = '<input type="number" step="any"' + attrs + ' value="' + esc(f.current) + '">';
+      } else if (f.kind === "boolean") {
+        html = '<input type="checkbox"' + attrs + (f.current === "true" ? " checked" : "") + '>';
+      } else if (f.kind === "picklist") {
+        var vals = (f.meta.pick_list_values || []).map(function (v) { return v.actual_value != null ? v.actual_value : v.display_value; })
+          .filter(function (v) { return v && v !== "-None-"; });
+        html = '<select' + attrs + '>' + optionsHtml(vals, f.current, "") + "</select>";
+      } else {
+        html = '<input type="text"' + attrs + ' value="' + esc(f.current) + '"' + (f.meta.length ? ' maxlength="' + f.meta.length + '"' : "") + ">";
+      }
+      el.innerHTML = html;
+      el.classList.toggle("is-dirty", !!(f.meta && f.current !== f.original));
+      if (f.meta) el.title = f.meta.field_label + " (" + state.header.entity + "." + f.meta.api_name + ")";
+    });
   }
 
-  function renderHeader() {
-    renderHeaderValue("hdrSeller", CONFIG.header.sellerName);
-    renderHeaderValue("hdrBuyer", CONFIG.header.buyerName);
-    renderHeaderValue("hdrClosing", CONFIG.header.closingDate);
-    renderHeaderValue("hdrLocation", CONFIG.header.location);
+  function onHeaderEdit(e) {
+    var key = e.target.getAttribute("data-hkey");
+    var f = key && state.header.keys[key];
+    if (!f || !f.meta) return;
+    f.current = e.target.type === "checkbox" ? String(e.target.checked) : e.target.value;
+    e.target.closest(".txn-value").classList.toggle("is-dirty", f.current !== f.original);
+    updateToolbar();
   }
 
   function renderConfigBanners() {
@@ -745,8 +856,12 @@
     $("btnRefresh").onclick = onRefresh;
     $("btnSave").onclick = saveChanges;
 
+    var hdr = document.querySelector(".txn-header");
+    hdr.addEventListener("input", onHeaderEdit);
+    hdr.addEventListener("change", onHeaderEdit);
+
     window.addEventListener("beforeunload", function (e) {
-      if (dirtyTasks().length) { e.preventDefault(); e.returnValue = ""; }
+      if (totalDirty()) { e.preventDefault(); e.returnValue = ""; }
     });
   }
 
@@ -778,7 +893,7 @@
   }
 
   function onRefresh() {
-    var n = dirtyTasks().length;
+    var n = totalDirty();
     var go = n ? confirmDialog("Discard " + n + " unsaved change(s) and reload from CRM?") : Promise.resolve(true);
     go.then(function (yes) {
       if (!yes) return;
@@ -853,11 +968,11 @@
   function saveChanges() {
     if (state.saving) return; // guards against repeated clicks
     var dirty = dirtyTasks();
-    if (!dirty.length) return;
+    if (!dirty.length && !headerDirtyKeys().length) return;
 
     state.saving = true;
     updateToolbar();
-    showLoader("Validating " + dirty.length + " task(s)…");
+    showLoader("Validating changes…");
     removeBanner("save-result");
 
     var invalid = [];
@@ -880,9 +995,10 @@
         })
       : Promise.resolve();
 
-    var outcome = { created: [], updated: [], failed: invalid.map(function (t) { return { task: t, message: t.error }; }) };
+    var outcome = { created: [], updated: [], header: null, failed: invalid.map(function (t) { return { task: t, message: t.error }; }) };
 
-    precheck
+    saveHeader()
+      .then(function (r) { outcome.header = r; return precheck; })
       .then(function () {
         showLoader("Saving " + valid.length + " task(s) to CRM…");
         return runPool(valid, WRITE_CONCURRENCY, function (t) {
@@ -934,6 +1050,7 @@
       .then(function () {
         state.saving = false;
         reportSave(outcome);
+        renderHeader();
         renderSheet();
         renderDiagnostics();
         updateToolbar();
@@ -943,17 +1060,22 @@
 
   function reportSave(o) {
     var okN = o.created.length + o.updated.length;
+    var hdrOk = o.header && o.header.ok;
+    var hdrFail = o.header && !o.header.ok;
     var html = [];
     if (okN) {
       html.push("<strong>Saved " + okN + " task(s)</strong> – " + o.created.length + " created, " + o.updated.length + " updated." +
         "<ul><li>" + o.created.concat(o.updated).map(function (t) { return esc(t.code + " " + t.label); }).join("</li><li>") + "</li></ul>");
     }
-    if (okN) addBanner("ok", html.join(""), { id: "save-result", html: true, dismissible: true });
+    if (hdrOk) html.push("<strong>Transaction details saved</strong> to the " + esc(state.header.entity) + " record.");
+    if (okN || hdrOk) addBanner("ok", html.join(""), { id: "save-result", html: true, dismissible: true });
     removeBanner("save-failed");
-    if (o.failed.length) {
+    if (o.failed.length || hdrFail) {
+      var items = o.failed.map(function (f) { return esc(f.task.code + " " + f.task.label + ": " + f.message); });
+      if (hdrFail) items.unshift(esc("Transaction details: " + o.header.message));
       addBanner("error",
-        "<strong>" + o.failed.length + " task(s) not saved</strong> – your changes are kept; fix and click Save Changes again." +
-        "<ul><li>" + o.failed.map(function (f) { return esc(f.task.code + " " + f.task.label + ": " + f.message); }).join("</li><li>") + "</li></ul>",
+        "<strong>" + items.length + " item(s) not saved</strong> – your changes are kept; fix and click Save Changes again." +
+        "<ul><li>" + items.join("</li><li>") + "</li></ul>",
         { id: "save-failed", html: true, dismissible: true });
       // Make sure failed rows are visible.
       o.failed.forEach(function (f) {
@@ -962,7 +1084,7 @@
         while (p) { state.expanded[p] = true; p = state.tasks[p].parentCode; }
       });
     }
-    if (!okN && !o.failed.length) addBanner("info", "No changes needed saving.", { id: "save-result" });
+    if (!okN && !o.header && !o.failed.length) addBanner("info", "No changes needed saving.", { id: "save-result" });
   }
 
   /* ==================================================================
