@@ -64,6 +64,8 @@ html, body {
   letter-spacing: 0.3px;
 }
 
+.title .build { font: 400 10px var(--font-alt); color: #b0b0b0; letter-spacing: 0; vertical-align: middle; margin-left: 6px; }
+
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .btn {

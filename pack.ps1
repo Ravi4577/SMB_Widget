@@ -8,6 +8,15 @@ $dist  = Join-Path $root "dist"
 $stage = Join-Path $dist "_stage"
 $zip   = Join-Path $dist "SMB_Transaction_Tracker.zip"
 
+# Stamp a build id into index.html: cache-busts style/config/script for
+# browsers and Zoho, and shows the running build next to the title.
+$build = Get-Date -Format "yyyyMMdd-HHmm"
+$indexPath = Join-Path $root "app\index.html"
+$html = [IO.File]::ReadAllText($indexPath)
+$html = [regex]::Replace($html, '\?v=[^"]*"', "?v=$build`"")
+$html = [regex]::Replace($html, 'id="buildVer">[^<]*<', "id=`"buildVer`">build $build<")
+[IO.File]::WriteAllText($indexPath, $html, (New-Object System.Text.UTF8Encoding($false)))
+
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 
