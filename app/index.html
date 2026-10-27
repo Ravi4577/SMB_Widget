@@ -4,34 +4,65 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SMB Transaction Tracker</title>
-  <meta name="build" content="20261027-1928">
+  <meta name="build" content="20261027-1942">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261027-1928">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20261027-1942">
 </head>
 <body>
   <div id="app" class="app">
-    <!-- Toolbar (the visible title comes from the Zoho popup) -->
+    <!-- Header -->
     <header class="topbar">
-      <h1 class="visually-hidden">SMB Transaction Tracker</h1>
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="M8.5 10l1.2 1.2L12 9"/><path d="M14 10.5h2.5"/><path d="M8.5 15l1.2 1.2L12 14"/><path d="M14 15.5h2.5"/></svg>
+        </span>
+        <div class="brand-text">
+          <h1 class="title">SMB Transaction Tracker</h1>
+          <p class="subtitle">Track and manage all transaction tasks in one place</p>
+        </div>
+      </div>
       <div class="toolbar">
         <span id="dirtyBadge" class="dirty-badge" hidden>0 unsaved</span>
-        <button type="button" id="btnExpandAll" class="btn btn-ghost">Expand All</button>
-        <button type="button" id="btnCollapseAll" class="btn btn-ghost">Collapse All</button>
-        <button type="button" id="btnRefresh" class="btn btn-secondary">Refresh</button>
-        <button type="button" id="btnSave" class="btn btn-primary" disabled>Save Changes</button>
+        <button type="button" id="btnExpandAll" class="btn btn-outline">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/></svg>
+          Expand All</button>
+        <button type="button" id="btnCollapseAll" class="btn btn-outline">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h6V4"/><path d="M10 10L3 3"/><path d="M20 14h-6v6"/><path d="M14 14l7 7"/></svg>
+          Collapse All</button>
+        <button type="button" id="btnRefresh" class="btn btn-outline">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          Refresh</button>
+        <button type="button" id="btnSave" class="btn btn-primary" disabled>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><rect x="7" y="13" width="10" height="6" rx="1"/></svg>
+          Save Changes</button>
+        <button type="button" id="btnClose" class="btn-icon" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
     </header>
 
-    <!-- Banners (config warnings, save results) -->
+    <!-- Banners (errors only) -->
     <div id="banners" class="banners" aria-live="polite"></div>
 
     <!-- Transaction header -->
     <section class="txn-header" aria-label="Transaction details">
-      <div class="txn-cell"><span class="txn-label">SELLER / PRACTICE NAME</span><span class="txn-value" id="hdrSeller"></span></div>
-      <div class="txn-cell"><span class="txn-label">CLOSING DATE</span><span class="txn-value" id="hdrClosing"></span></div>
-      <div class="txn-cell"><span class="txn-label">BUYER / COMPANY NAME</span><span class="txn-value" id="hdrBuyer"></span></div>
-      <div class="txn-cell"><span class="txn-label">LOCATION</span><span class="txn-value" id="hdrLocation"></span></div>
+      <div class="txn-cell">
+        <span class="txn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5z"/></svg></span>
+        <span class="txn-label">SELLER / PRACTICE NAME</span><span class="txn-value" id="hdrSeller"></span>
+      </div>
+      <div class="txn-cell">
+        <span class="txn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/></svg></span>
+        <span class="txn-label">CLOSING DATE</span><span class="txn-value" id="hdrClosing"></span>
+      </div>
+      <div class="txn-cell">
+        <span class="txn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M14 10h5a1 1 0 0 1 1 1v10"/><path d="M3 21h18"/><path d="M7.5 8h3M7.5 12h3M7.5 16h3M16.5 14h1M16.5 17.5h1"/></svg></span>
+        <span class="txn-label">BUYER / COMPANY NAME</span><span class="txn-value" id="hdrBuyer"></span>
+      </div>
+      <div class="txn-cell">
+        <span class="txn-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+        <span class="txn-label">LOCATION</span><span class="txn-value" id="hdrLocation"></span>
+      </div>
     </section>
 
     <!-- Checklist -->
@@ -39,11 +70,11 @@
       <table class="sheet" id="sheet">
         <colgroup>
           <col class="c-code"><col class="c-item"><col class="c-owner"><col class="c-status">
-          <col class="c-date"><col class="c-date"><col class="c-risk"><col class="c-details">
+          <col class="c-date"><col class="c-date"><col class="c-risk"><col class="c-details"><col class="c-actions">
         </colgroup>
         <thead>
           <tr>
-            <th class="th-code"></th>
+            <th class="th-code">#</th>
             <th>PHASE / ITEM</th>
             <th>OWNER</th>
             <th>STATUS</th>
@@ -51,11 +82,15 @@
             <th>COMPLETED DATE</th>
             <th>AT RISK?</th>
             <th>TASK DETAILS</th>
+            <th class="th-actions">ACTIONS</th>
           </tr>
         </thead>
         <tbody id="sheetBody"></tbody>
       </table>
     </div>
+
+    <!-- Row actions menu -->
+    <div id="rowMenu" class="row-menu" role="menu" hidden></div>
 
     <!-- Loading overlay -->
     <div id="loader" class="loader" hidden>
@@ -77,7 +112,7 @@
 
   <!-- Zoho CRM Embedded App SDK -->
   <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
-  <script src="config.js?v=20261027-1928"></script>
-  <script src="script.js?v=20261027-1928"></script>
+  <script src="config.js?v=20261027-1942"></script>
+  <script src="script.js?v=20261027-1942"></script>
 </body>
 </html>

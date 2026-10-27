@@ -109,7 +109,8 @@
     },
     CRM: {
       UI: {
-        Resize: function (size) { window.__lastResize = size; console.info("[mock] Resize", size); return Promise.resolve(true); }
+        Resize: function (size) { window.__lastResize = size; console.info("[mock] Resize", size); return Promise.resolve(true); },
+        Popup: { close: function () { window.__closed = true; console.info("[mock] Popup.close"); return Promise.resolve(true); } }
       },
       META: {
         getModules: function () { return delay({ modules: [{ api_name: MODULE, plural_label: "SMB Transaction Tracker", singular_label: "SMB Transaction Tracker", module_name: "SMB_Transaction_Tracker" }, { api_name: "Deals", plural_label: "Deals", singular_label: "Deal" }] }); },

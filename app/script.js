@@ -688,6 +688,33 @@
     return true;
   }
 
+  // Presentation helpers ---------------------------------------------------
+  function svg(body, size) {
+    return '<svg viewBox="0 0 24 24" width="' + (size || 18) + '" height="' + (size || 18) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + "</svg>";
+  }
+  var PHASE_ICONS = {
+    LOI: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>', 22),
+    UC:  svg('<path d="M11 17l-1.5 1.5a2 2 0 0 1-2.8-2.8L10 12.4"/><path d="M3 11l4-4 3 1 3-2 5 5-4 4"/><path d="M21 11l-4-4"/><path d="M14 14l2 2M12 16l2 2"/>', 22),
+    RE:  svg('<path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M14 10h5a1 1 0 0 1 1 1v10"/><path d="M3 21h18"/><path d="M7.5 8h3M7.5 12h3M7.5 16h3M16.5 14h1M16.5 17.5h1"/>', 22),
+    CL:  svg('<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M17 6l2 2M15 8l2 2"/>', 22)
+  };
+  var KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+  var CAL_ICON = svg('<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/>', 15);
+  var AVATAR_COLORS = {
+    "Buyer": "#8b7ff0", "Seller": "#ef7f9c", "Buyer / Seller": "#f29e4c", "SMB": "#2bb3a3",
+    "Buyer Attorney": "#6f86f2", "Seller Attorney": "#5a8ff0", "Title Company": "#4aa3df"
+  };
+  function avatarHtml(owner) {
+    if (!owner) return '<span class="avatar"></span>';
+    return '<span class="avatar" style="background:' + (AVATAR_COLORS[owner] || "#94a3b8") + '">' + esc(owner.charAt(0).toUpperCase()) + "</span>";
+  }
+  function statusClass(v) {
+    if (!v) return "";
+    if (v === CONFIG.options.completeStatus) return "status-complete";
+    if (v === "In Progress") return "status-progress";
+    return "status-none";
+  }
+
   function renderSheet() {
     var html = [];
     PHASES.forEach(function (phase) {
@@ -702,14 +729,18 @@
         if (t.original.status === CONFIG.options.completeStatus) complete++;
         if (t.original.atRisk === "Yes") risk++;
       });
+      var pct = leaves ? Math.round(complete / leaves * 100) : 0;
       html.push(
         '<tr class="row-phase ' + phase.color + '" data-phase="' + phase.key + '">' +
           '<td class="cell-code">' + esc(phase.code) + '</td>' +
-          '<td colspan="7"><div class="cell-item">' +
+          '<td colspan="6"><div class="cell-item">' +
             '<button type="button" class="toggle" data-toggle="P:' + phase.key + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(phase.label) + '">' + CHEVRON + '</button>' +
+            '<span class="phase-icon">' + (PHASE_ICONS[phase.key] || "") + '</span>' +
             '<span>' + esc(phase.label) + '</span>' +
             '<span class="phase-meta">' + saved + ' of ' + leaves + ' tracked · ' + complete + ' complete' + (risk ? ' · <span class="err-text">' + risk + ' at risk</span>' : '') + '</span>' +
           '</div></td>' +
+          '<td><div class="phase-progress"><div class="bar"><span style="width:' + pct + '%"></span></div><span class="pct">' + pct + '%</span></div></td>' +
+          '<td class="cell-actions"><button type="button" class="menu-btn" data-menu="P:' + phase.key + '" aria-label="Phase actions">' + KEBAB + '</button></td>' +
         '</tr>'
       );
       codes.forEach(function (c) {
@@ -754,7 +785,7 @@
     var open = !!state.expanded[t.code];
     return '<tr class="row-task row-parent depth-' + t.depth + '" data-code="' + esc(t.code) + '" title="' + esc(t.phaseLabel + " › " + t.label) + '">' +
       '<td class="cell-code">' + esc(t.code) + '</td>' +
-      '<td colspan="7"><div class="cell-item">' +
+      '<td colspan="8"><div class="cell-item">' +
         '<button type="button" class="toggle" data-toggle="' + esc(t.code) + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(t.label) + '">' + CHEVRON + '</button>' +
         '<span class="item-label">' + esc(t.label) + '</span></div></td>' +
     '</tr>';
@@ -768,19 +799,21 @@
       ? '<button type="button" class="toggle" data-toggle="' + esc(t.code) + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(t.label) + '">' + CHEVRON + '</button>'
       : '<span class="toggle-spacer"></span>';
     var ownerPh = "Select…";
-    var statusCls = v.status === CONFIG.options.completeStatus ? " status-complete" : (v.status === "In Progress" ? " status-progress" : "");
+    var statusCls = " " + statusClass(v.status);
 
     return '<tr class="' + rowClass(t) + '" data-code="' + esc(t.code) + '" title="' + esc(t.phaseLabel + " › " + t.label) + '">' +
       '<td class="cell-code">' + esc(t.code) + '</td>' +
       '<td><div class="cell-item">' + toggle +
         '<span class="item-label">' + esc(t.label) + '</span><span class="dot-slot">' + dotHtml(t) + '</span></div>' +
         '<div class="row-msg"' + (t.error ? "" : " hidden") + '>' + esc(t.error || "") + '</div></td>' +
-      '<td><select data-key="owner" aria-label="Owner" class="' + (v.owner ? "" : "placeholder") + inv(t, "owner") + '">' + optionsHtml(CONFIG.options.owner, v.owner, ownerPh) + '</select></td>' +
+      '<td><div class="owner-wrap">' + avatarHtml(v.owner) +
+        '<select data-key="owner" aria-label="Owner" class="' + (v.owner ? "" : "placeholder") + inv(t, "owner") + '">' + optionsHtml(CONFIG.options.owner, v.owner, ownerPh) + '</select></div></td>' +
       '<td><select data-key="status" aria-label="Status" class="' + (v.status ? "" : "placeholder") + statusCls + inv(t, "status") + '">' + optionsHtml(CONFIG.options.status, v.status, "Select…") + '</select></td>' +
-      '<td><input type="date" data-key="dueDate" aria-label="Due date" value="' + esc(v.dueDate) + '" class="' + inv(t, "dueDate") + '"></td>' +
-      '<td><input type="date" data-key="completeDate" aria-label="Completed date" value="' + esc(v.completeDate) + '" class="' + inv(t, "completeDate") + '"></td>' +
+      '<td><div class="date-wrap">' + CAL_ICON + '<input type="date" data-key="dueDate" aria-label="Due date" value="' + esc(v.dueDate) + '" class="' + inv(t, "dueDate") + '"></div></td>' +
+      '<td><div class="date-wrap">' + CAL_ICON + '<input type="date" data-key="completeDate" aria-label="Completed date" value="' + esc(v.completeDate) + '" class="' + inv(t, "completeDate") + '"></div></td>' +
       '<td><select data-key="atRisk" aria-label="At risk" class="' + (v.atRisk ? "" : "placeholder") + (v.atRisk === "Yes" ? " risk-yes" : "") + inv(t, "atRisk") + '">' + optionsHtml(CONFIG.options.atRisk, v.atRisk, "—") + '</select></td>' +
       '<td><textarea data-key="taskDetails" aria-label="Task details" rows="1" maxlength="' + CONFIG.validation.taskDetailsMaxLength + '" class="' + inv(t, "taskDetails") + '">' + esc(v.taskDetails) + '</textarea></td>' +
+      '<td class="cell-actions"><button type="button" class="menu-btn" data-menu="' + esc(t.code) + '" aria-label="Task actions">' + KEBAB + '</button></td>' +
     '</tr>';
   }
 
@@ -800,9 +833,12 @@
       if (el.tagName === "SELECT") el.classList.toggle("placeholder", !el.value);
     });
     var st = tr.querySelector('[data-key="status"]');
-    st.classList.toggle("status-complete", st.value === CONFIG.options.completeStatus);
-    st.classList.toggle("status-progress", st.value === "In Progress");
+    ["status-complete", "status-progress", "status-none"].forEach(function (c) { st.classList.remove(c); });
+    var sc = statusClass(st.value);
+    if (sc) st.classList.add(sc);
     tr.querySelector('[data-key="atRisk"]').classList.toggle("risk-yes", t.current.atRisk === "Yes");
+    var av = tr.querySelector(".owner-wrap .avatar");
+    if (av) av.outerHTML = avatarHtml(t.current.owner);
   }
 
   function updateToolbar() {
@@ -1033,6 +1069,8 @@
     var body = $("sheetBody");
 
     body.addEventListener("click", function (e) {
+      var menuBtn = e.target.closest(".menu-btn");
+      if (menuBtn) { e.stopPropagation(); openRowMenu(menuBtn); return; }
       var btn = e.target.closest("[data-toggle]");
       var phaseRow = e.target.closest(".row-phase");
       var parentRow = e.target.closest(".row-parent");
@@ -1059,6 +1097,20 @@
     };
     $("btnRefresh").onclick = onRefresh;
     $("btnSave").onclick = saveChanges;
+    $("btnClose").onclick = closeWidget;
+
+    // Row actions menu
+    $("rowMenu").addEventListener("click", function (e) {
+      var item = e.target.closest("button[data-act]");
+      if (!item || item.disabled) return;
+      runRowAction(item.getAttribute("data-act"), $("rowMenu").getAttribute("data-for"));
+      closeRowMenu();
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest("#rowMenu") && !e.target.closest(".menu-btn")) closeRowMenu();
+    });
+    $("sheetWrap").addEventListener("scroll", closeRowMenu);
+    window.addEventListener("resize", closeRowMenu);
 
     var hdr = document.querySelector(".txn-header");
     hdr.addEventListener("input", onHeaderEdit);
@@ -1066,7 +1118,7 @@
     bindLookupPicker(hdr);
 
     window.addEventListener("beforeunload", function (e) {
-      if (totalDirty()) { e.preventDefault(); e.returnValue = ""; }
+      if (totalDirty() && !state.closing) { e.preventDefault(); e.returnValue = ""; }
     });
   }
 
@@ -1095,6 +1147,79 @@
         }
       });
     }
+  }
+
+  /* ---------- Row actions menu (⋮) ---------- */
+  function openRowMenu(btn) {
+    var key = btn.getAttribute("data-menu");
+    var menu = $("rowMenu");
+    var items;
+    if (key.indexOf("P:") === 0) {
+      items = [["expandPhase", "Expand all items", true], ["collapsePhase", "Collapse phase", true]];
+    } else {
+      var t = state.tasks[key];
+      items = [
+        ["undo", "Undo unsaved changes", isDirty(t)],
+        ["complete", "Mark as " + CONFIG.options.completeStatus, t.current.status !== CONFIG.options.completeStatus]
+      ];
+    }
+    menu.innerHTML = items.map(function (i) {
+      return '<button type="button" role="menuitem" data-act="' + i[0] + '"' + (i[2] ? "" : " disabled") + ">" + esc(i[1]) + "</button>";
+    }).join("");
+    menu.setAttribute("data-for", key);
+    menu.hidden = false;
+    var r = btn.getBoundingClientRect();
+    var left = Math.min(r.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8);
+    var top = r.bottom + 4;
+    if (top + menu.offsetHeight > window.innerHeight - 8) top = r.top - menu.offsetHeight - 4;
+    menu.style.left = Math.max(8, left) + "px";
+    menu.style.top = Math.max(8, top) + "px";
+  }
+
+  function closeRowMenu() { $("rowMenu").hidden = true; }
+
+  function runRowAction(act, key) {
+    if (act === "expandPhase" || act === "collapsePhase") {
+      var pk = key.slice(2);
+      var open = act === "expandPhase";
+      state.expanded[key] = open;
+      state.taskOrder.forEach(function (c) {
+        var t = state.tasks[c];
+        if (t.phaseKey === pk && t.childCodes.length) state.expanded[c] = open;
+      });
+      renderSheet();
+      return;
+    }
+    var t = state.tasks[key];
+    if (!t) return;
+    if (act === "undo") {
+      t.current = JSON.parse(JSON.stringify(t.original));
+      t.error = null;
+      t.invalidKeys = {};
+      refreshRow(t);
+      updateToolbar();
+    } else if (act === "complete") {
+      // Goes through the normal edit path, so the completed-date prompt still applies.
+      var sel = document.querySelector('tr[data-code="' + CSS.escape(t.code) + '"] [data-key="status"]');
+      if (!sel) return;
+      sel.value = CONFIG.options.completeStatus;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  // Close the CRM popup (asks first when there are unsaved changes).
+  function closeWidget() {
+    var n = totalDirty();
+    var go = n ? confirmDialog("Close without saving " + n + " unsaved change(s)?") : Promise.resolve(true);
+    go.then(function (yes) {
+      if (!yes) return;
+      try {
+        if (ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.close) {
+          state.closing = true; // skip the browser's leave-page prompt
+          ZOHO.CRM.UI.Popup.close();
+        }
+      } catch (e) { log("close failed", e); }
+    });
   }
 
   function onRefresh() {
