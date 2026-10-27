@@ -7,7 +7,7 @@ All of these live in [app/config.js](app/config.js). The widget's **Configuratio
 - [ ] Set `CONFIG.module.apiName` (for example `"SMB_Transaction_Tracker"`). Until you do, the widget finds the module by its label and shows "auto-detected" in the diagnostics panel.
 
 ## 2. Field API names: already supplied and checked at runtime
-`Name, Owner1, Status, At_Risk, Due_Date, Complete_Date, Task_Details, Letter_of_Intent, Under_Contract, Real_Estate, Closing`
+`Name, Owner1, Status, At_Risk, Due_Date, Complete_Date, Task_Details, Phase_Items, Sub_Items`
 
 - [ ] On every load the widget calls `ZOHO.CRM.META.getFields`. If any field is missing, it shows a red banner and turns off saving.
 - [ ] `Owner1` is the task-owner text field. The standard record owner (`Owner`) is never written.

@@ -19,6 +19,7 @@
   var CONFIG = window.SMB_CONFIG;
   var PHASES = window.SMB_PHASES;
   var F = CONFIG.fields;
+  var TF = CONFIG.taskFields; // Phase_Items / Sub_Items
   var VALUE_KEYS = ["owner", "status", "dueDate", "completeDate", "atRisk", "taskDetails"];
   var KEY_LABELS = {
     owner: "Owner", status: "Status", dueDate: "Due Date",
@@ -42,6 +43,8 @@
     fieldsMeta: {},     // api_name -> field meta
     picklistValues: {}, // api_name -> [actual values]
     picklistSkips: {},  // "field|value" -> true (diagnostics)
+    phaseValues: {},    // phase key -> exact Phase_Items picklist value
+    subItemMaxLength: 255,
     configErrors: [],   // blocking problems: saving disabled
     configWarnings: [],
     txn: { mode: CONFIG.transactionLink.mode, parentId: null, parentModule: CONFIG.transactionLink.parentModule },
@@ -315,11 +318,27 @@
 
       var required = [];
       Object.keys(F).forEach(function (k) { required.push(F[k]); });
-      Object.keys(CONFIG.phaseFields).forEach(function (k) { required.push(CONFIG.phaseFields[k]); });
+      required.push(TF.phase, TF.subItem);
       if (state.txn.mode === "lookup" && CONFIG.transactionLink.lookupField) required.push(CONFIG.transactionLink.lookupField);
 
       var missing = required.filter(function (api) { return !state.fieldsMeta[api]; });
       if (missing.length) state.configErrors.push("These fields were not found in module " + state.moduleApi + ": " + missing.join(", "));
+
+      // Map each phase to the exact Phase_Items picklist value CRM permits.
+      state.phaseValues = {};
+      var phaseMeta = state.fieldsMeta[TF.phase];
+      if (phaseMeta) {
+        var allowed = (phaseMeta.pick_list_values || [])
+          .map(function (v) { return v.actual_value != null ? v.actual_value : v.display_value; })
+          .filter(function (v) { return v && v !== "-None-"; });
+        PHASES.forEach(function (p) {
+          var hit = allowed.filter(function (a) { return norm(a) === norm(p.label); })[0];
+          if (hit) state.phaseValues[p.key] = hit;
+          else state.configWarnings.push(TF.phase + " picklist has no value \"" + p.label + "\" – " + p.label + " tasks cannot be saved.");
+        });
+      }
+      var subMeta = state.fieldsMeta[TF.subItem];
+      state.subItemMaxLength = (subMeta && subMeta.length) || 255;
 
       state.picklistValues = {};
       if (CONFIG.picklists.enabled) {
@@ -555,6 +574,23 @@
     return v;
   }
 
+  // What the CRM record holds for the task's place in the hierarchy.
+  // Phase_Items / Sub_Items first; records saved before those fields existed
+  // fall back to the legacy per-phase field. The task itself is still
+  // identified by the record Name (phase key + code), never by these labels,
+  // because several tasks share a label.
+  function readTaskFields(t, rec) {
+    var legacy = rec[CONFIG.legacyPhaseFields[t.phaseKey]];
+    t.crm = {
+      phase: rec[TF.phase] == null ? "" : String(rec[TF.phase]),
+      subItem: rec[TF.subItem] == null ? "" : String(rec[TF.subItem]),
+      legacySubItem: legacy == null ? "" : String(legacy)
+    };
+    if (t.crm.phase && t.crm.phase !== state.phaseValues[t.phaseKey]) {
+      log("record", rec[F.name], "has", TF.phase, "=", t.crm.phase, "but its task belongs to", t.phaseLabel);
+    }
+  }
+
   // keepEdits: preserve unsaved current values on tasks that are still dirty.
   function applyRecords(rows, keepEdits) {
     var idx = indexRecords(rows);
@@ -569,9 +605,11 @@
       if (rec) {
         t.recordId = rec.id;
         t.original = recordToValues(rec);
+        readTaskFields(t, rec);
         if (!stillDirty) t.current = recordToValues(rec);
       } else {
         t.recordId = null;
+        t.crm = null;
         t.original = emptyValues();
         if (!stillDirty) t.current = emptyValues();
       }
@@ -866,7 +904,7 @@
 
     var fieldList = [];
     Object.keys(F).forEach(function (k) { fieldList.push(F[k]); });
-    Object.keys(CONFIG.phaseFields).forEach(function (k) { fieldList.push(CONFIG.phaseFields[k]); });
+    fieldList.push(TF.phase, TF.subItem);
     row("Fields", fieldList.map(function (api) {
       var m = state.fieldsMeta[api];
       return m ? "<span class='ok-text'>✓</span> <code>" + esc(api) + "</code> " + esc(m.data_type || "")
@@ -1044,7 +1082,22 @@
     if (v.taskDetails.length > CONFIG.validation.taskDetailsMaxLength) {
       errs.push("Task Details exceeds " + CONFIG.validation.taskDetailsMaxLength + " characters"); t.invalidKeys.taskDetails = true;
     }
+    // Phase_Items must be an exact permitted picklist value; Sub_Items is never truncated.
+    if (!state.phaseValues[t.phaseKey]) {
+      errs.push(TF.phase + " picklist has no value \"" + t.phaseLabel + "\" – add it in CRM");
+    }
+    if (t.label.length > state.subItemMaxLength) {
+      errs.push("Task name is longer than " + TF.subItem + " allows (" + state.subItemMaxLength + " characters)");
+    }
     return errs;
+  }
+
+  // Phase_Items / Sub_Items the record should hold for this task.
+  function taskFieldValues(t) {
+    var out = {};
+    out[TF.phase] = state.phaseValues[t.phaseKey];
+    out[TF.subItem] = t.label; // deepest selected task / subitem name
+    return out;
   }
 
   function crmValue(k, v) { return v === "" ? null : v; }
@@ -1068,7 +1121,8 @@
   function createPayload(t) {
     var p = {};
     p[F.name] = recordName(t);
-    p[CONFIG.phaseFields[t.phaseKey]] = t.label; // deepest task name -> its phase field only
+    var tf = taskFieldValues(t); // Phase_Items + Sub_Items (legacy phase fields are not written)
+    Object.keys(tf).forEach(function (k) { p[k] = tf[k]; });
     VALUE_KEYS.forEach(function (k) { if (t.current[k]) p[F[k]] = t.current[k]; });
     if (state.txn.mode === "lookup") p[CONFIG.transactionLink.lookupField] = { id: state.txn.parentId };
     var pl = picklistPayload(t);
@@ -1076,10 +1130,17 @@
     return p;
   }
 
-  // Only changed fields are sent, so concurrent edits to other fields are not overwritten.
+  // Only changed fields are sent, so concurrent edits to other fields are not
+  // overwritten. Phase_Items / Sub_Items are added only when the record does
+  // not already hold the right values (e.g. records saved before they existed);
+  // legacy phase fields are left as they are.
   function updatePayload(t) {
     var p = { id: t.recordId };
     changedKeys(t).forEach(function (k) { p[F[k]] = crmValue(k, t.current[k]); });
+    var tf = taskFieldValues(t);
+    var crm = t.crm || {};
+    if (crm.phase !== tf[TF.phase]) p[TF.phase] = tf[TF.phase];
+    if (crm.subItem !== tf[TF.subItem]) p[TF.subItem] = tf[TF.subItem];
     return p;
   }
 
@@ -1111,7 +1172,7 @@
           var idx = indexRecords(rows);
           valid.forEach(function (t) {
             var rec = !t.recordId && idx.byName[recordName(t)];
-            if (rec) { t.recordId = rec.id; t.original = recordToValues(rec); }
+            if (rec) { t.recordId = rec.id; t.original = recordToValues(rec); readTaskFields(t, rec); }
           });
         })
       : Promise.resolve();
@@ -1136,6 +1197,10 @@
             if (r.ok) {
               if (isNew) t.recordId = r.id || t.recordId;
               t.original = sent; // what CRM now holds for the fields we sent
+              var tf = taskFieldValues(t);
+              t.crm = { phase: tf[TF.phase], subItem: tf[TF.subItem], legacySubItem: (t.crm || {}).legacySubItem || "" };
+            } else if (/Phase_Items/.test(r.message || "")) {
+              r.message = "CRM rejected " + TF.phase + " \"" + taskFieldValues(t)[TF.phase] + "\": " + r.message;
             }
             r.isNew = isNew;
             return r;

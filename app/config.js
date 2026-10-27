@@ -37,8 +37,17 @@
       taskDetails: "Task_Details"
     },
 
-    // Phase -> Single Line field that receives the deepest selected task name.
-    phaseFields: {
+    // Task location in the hierarchy, written on every create (and on update
+    // when the record does not hold these values yet).
+    taskFields: {
+      phase: "Phase_Items", // Picklist: Letter of Intent | Under Contract | Real Estate | Closing
+      subItem: "Sub_Items"  // Single Line: deepest selected task / subitem name
+    },
+
+    // LEGACY – the per-phase Single Line fields used before Phase_Items /
+    // Sub_Items existed. Never written any more; only read so records saved
+    // earlier still show their task name (records are matched by Name).
+    legacyPhaseFields: {
       LOI: "Letter_of_Intent",
       UC: "Under_Contract",
       RE: "Real_Estate",
@@ -57,7 +66,9 @@
      * Each rule: { field, appliesTo(task) -> bool, candidates(task) -> [values] }
      * ------------------------------------------------------------------ */
     picklists: {
-      enabled: true,
+      // Off: these older picklists are not in the module any more, and the
+      // phase now goes to Phase_Items (see taskFields above).
+      enabled: false,
       rules: [
         {
           field: "Phase_Item",

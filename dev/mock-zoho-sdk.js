@@ -32,13 +32,15 @@
     ["Closing", "text"], ["Owner1", "text"], ["Status", "text"], ["At_Risk", "text"], ["Due_Date", "date"],
     ["Complete_Date", "date"], ["Task_Details", "textarea"], ["LOI_Executed_Date", "text"],
     ["Introduction_to_Client_s_CPA", "text"], ["Introduce_Client_to_M_A_Attorney", "text"], ["Data_Room_Access_Updated", "text"],
-    ["Phase_Item", "picklist", ["-None-", "Letter of Intent", "Under Contract", "Real Estate", "Closing"]],
+    ["Phase_Items", "picklist", ["-None-", "Letter of Intent", "Under Contract", "Real Estate", "Closing"]],
+    ["Sub_Items", "text"],
     ["Escrow_Account", "picklist", ["-None-", "Escrow Account"]],
     ["Escrow_Account_Sub_Item", "picklist", ["-None-", "Escrow Initiated / Contact Information Shared", "Escrow Instructions Shared / Signed / Fee Paid", "Earnest Money Deposit (Initial)", "Earnest Money Deposit (Subsequent)"]],
     ["Letter_of_intent_Subitem", "picklist", ["-None-", "LOI Executed Date", "Introduction to Client's CPA", "Escrow Account", "Introduce Client to M&A Attorney", "Data Room Access Updated"]],
     ["Under_Contract_Sub_Item", "picklist", ["-None-", "Due Diligence", "Financing Application"]]
   ].map(function (f) {
     var m = { api_name: f[0], data_type: f[1] };
+    if (f[1] === "text") m.length = 255;
     if (f[2]) m.pick_list_values = f[2].map(function (v) { return { display_value: v, actual_value: v }; });
     return m;
   });

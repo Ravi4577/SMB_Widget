@@ -24,7 +24,7 @@ SMB Widget/
 | Topic | Behaviour |
 |---|---|
 | Record per task | Record `Name` = `SMB-<PHASE>-<code>`, for example `SMB-LOI-1.3.3` (phase keys: LOI, UC, RE, CL). The Name is how a CRM record is matched back to a task in the hierarchy. |
-| Phase field | The deepest selected task's label is written **only** to its phase field: `Letter_of_Intent`, `Under_Contract`, `Real_Estate` or `Closing`. |
+| Phase / task fields | Every create writes `Phase_Items` (picklist: the main phase, validated against CRM's permitted values) and `Sub_Items` (the deepest selected task name, never truncated). The old per-phase fields `Letter_of_Intent`, `Under_Contract`, `Real_Estate` and `Closing` are no longer written. Records saved earlier still load (they are matched by `Name`), and editing one fills in `Phase_Items` / `Sub_Items` without clearing the old field. |
 | Task fields | `Owner1`, `Status`, `Due_Date`, `Complete_Date` (YYYY-MM-DD), `At_Risk`, `Task_Details`. |
 | Create vs update | Tasks that have no record are **created**. Tasks that have a record are **updated by record ID**, and only the fields that changed are sent. |
 | Duplicate protection | Save is locked while a save is running. Before creating records, CRM is re-read, and a task whose record already exists is turned into an update. |
