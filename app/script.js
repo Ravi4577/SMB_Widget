@@ -368,9 +368,11 @@
   }
 
   function loadHeader() {
+    var prev = (state.header && state.header.keys) || {};
+    function localValue(key) { return prev[key] && !prev[key].meta ? prev[key].current || "" : ""; }
     var h = { entity: null, id: null, keys: {} };
     state.header = h;
-    HEADER_KEYS.forEach(function (k) { h.keys[k[0]] = { meta: null, reason: "Open the widget from a record to edit this field" }; });
+    HEADER_KEYS.forEach(function (k) { h.keys[k[0]] = { meta: null, current: localValue(k[0]), reason: "Widget not opened from a record" }; });
 
     if (state.txn.parentId && state.txn.parentModule) {
       h.entity = state.txn.parentModule; h.id = state.txn.parentId;
@@ -395,7 +397,7 @@
         }
         if (meta && cfg.field && meta.api_name !== cfg.field) log("header", key, "field", cfg.field, "not found; using", meta.api_name);
         if (!meta) {
-          h.keys[key] = { meta: null, reason: "Field \"" + (cfg.field || cfg.labels[0]) + "\" not found in " + h.entity };
+          h.keys[key] = { meta: null, current: localValue(key), reason: "Field \"" + (cfg.field || cfg.labels[0]) + "\" not found in " + h.entity };
           state.configWarnings.push("Header \"" + key + "\": no field found in " + h.entity + (cfg.field ? " (" + cfg.field + ")" : " by label") + ".");
           return;
         }
@@ -712,7 +714,8 @@
       var attrs = ' data-hkey="' + key + '" class="hdr-input"';
       var html;
       if (!f.meta) {
-        html = '<span class="hdr-note">' + esc(f.reason || "") + "</span>";
+        // No CRM field: still typeable, but the value stays in the widget only (never saved).
+        html = '<input type="text"' + attrs + ' value="' + esc(f.current || "") + '" title="' + esc((f.reason || "") + " – not saved to CRM") + '">';
       } else if (f.kind === "readonly") {
         var why = (f.meta.read_only || f.meta.field_read_only) ? "read-only for your profile" : "field type \"" + f.meta.data_type + "\" can't be edited here";
         html = '<span class="hdr-readonly">' + esc(f.display) + '</span><span class="hdr-note">' + esc(f.meta.api_name + ": " + why) + "</span>";
@@ -743,7 +746,8 @@
   function onHeaderEdit(e) {
     var key = e.target.getAttribute("data-hkey");
     var f = key && state.header.keys[key];
-    if (!f || !f.meta) return;
+    if (!f) return;
+    if (!f.meta) { f.current = e.target.value; return; } // widget-only value, nothing to save
     if (f.kind === "lookup") { if (e.type === "input") lookupSearch(e.target, f); return; }
     f.current = e.target.type === "checkbox" ? String(e.target.checked) : e.target.value;
     e.target.closest(".txn-value").classList.toggle("is-dirty", f.current !== f.original);

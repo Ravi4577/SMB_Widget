@@ -51,6 +51,8 @@
     { api_name: "Location", field_label: "Location", data_type: "text", length: 255 }
   ];
 
+  if (qs.get("noloc") === "1") DEAL_FIELDS = DEAL_FIELDS.filter(function (f) { return f.api_name !== "Location"; });
+
   var CONTACTS = [
     { id: "c1", Full_Name: "James McCarthy" }, { id: "c2", Full_Name: "Sarah Cherry" },
     { id: "c3", Full_Name: "Sarah Connor" }, { id: "c4", Full_Name: "David Lee" }
