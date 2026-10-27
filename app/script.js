@@ -386,17 +386,16 @@
       HEADER_KEYS.forEach(function (pair) {
         var key = pair[0];
         var cfg = CONFIG.header[key] || {};
-        var meta = null;
-        if (cfg.field) {
-          meta = byApi[cfg.field] || null;
-        } else {
-          var wanted = (cfg.labels || []).map(norm);
-          for (var i = 0; i < wanted.length && !meta; i++) {
-            meta = res[1].filter(function (f) { return norm(f.field_label) === wanted[i]; })[0] || null;
-          }
+        // Configured API name first (exact, then case-insensitive), then labels.
+        var meta = cfg.field ? (byApi[cfg.field] ||
+          res[1].filter(function (f) { return norm(f.api_name) === norm(cfg.field); })[0] || null) : null;
+        var wanted = (cfg.labels || []).map(norm);
+        for (var i = 0; i < wanted.length && !meta; i++) {
+          meta = res[1].filter(function (f) { return norm(f.field_label) === wanted[i]; })[0] || null;
         }
+        if (meta && cfg.field && meta.api_name !== cfg.field) log("header", key, "field", cfg.field, "not found; using", meta.api_name);
         if (!meta) {
-          h.keys[key] = { meta: null, reason: "No matching field in " + h.entity + " – set CONFIG.header." + key + ".field in config.js" };
+          h.keys[key] = { meta: null, reason: "Field \"" + (cfg.field || cfg.labels[0]) + "\" not found in " + h.entity };
           state.configWarnings.push("Header \"" + key + "\": no field found in " + h.entity + (cfg.field ? " (" + cfg.field + ")" : " by label") + ".");
           return;
         }
@@ -657,7 +656,7 @@
     var toggle = t.childCodes.length
       ? '<button type="button" class="toggle" data-toggle="' + esc(t.code) + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(t.label) + '">' + CHEVRON + '</button>'
       : '<span class="toggle-spacer"></span>';
-    var ownerPh = t.suggestedOwner ? "Select (suggested: " + t.suggestedOwner + ")" : "Select…";
+    var ownerPh = "Select…";
     var statusCls = v.status === CONFIG.options.completeStatus ? " status-complete" : (v.status === "In Progress" ? " status-progress" : "");
 
     return '<tr class="' + rowClass(t) + '" data-code="' + esc(t.code) + '" title="' + esc(t.phaseLabel + " › " + t.label) + '">' +
@@ -713,9 +712,10 @@
       var attrs = ' data-hkey="' + key + '" class="hdr-input"';
       var html;
       if (!f.meta) {
-        html = '<input type="text" disabled' + attrs + ' title="' + esc(f.reason || "") + '">';
+        html = '<span class="hdr-note">' + esc(f.reason || "") + "</span>";
       } else if (f.kind === "readonly") {
-        html = '<span class="hdr-readonly" title="' + esc(f.meta.field_label + " (" + f.meta.api_name + ", " + f.meta.data_type + ") – read-only here") + '">' + esc(f.display) + "</span>";
+        var why = (f.meta.read_only || f.meta.field_read_only) ? "read-only for your profile" : "field type \"" + f.meta.data_type + "\" can't be edited here";
+        html = '<span class="hdr-readonly">' + esc(f.display) + '</span><span class="hdr-note">' + esc(f.meta.api_name + ": " + why) + "</span>";
       } else if (f.kind === "lookup") {
         // Type to search the related module, then pick a record from the list.
         html = '<div class="lk"><input type="text" autocomplete="off"' + attrs.replace('class="hdr-input"', 'class="hdr-input lk-input"') +

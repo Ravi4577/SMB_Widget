@@ -357,3 +357,4 @@ select.placeholder { color: var(--text); }
 .lk-item { padding: 7px 10px; cursor: pointer; }
 .lk-item:hover { background: #eef4fb; }
 .lk-empty { padding: 7px 10px; color: var(--muted); }
+.hdr-note { padding: 5px 8px; font-size: 11.5px; color: var(--error); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
