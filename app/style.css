@@ -175,16 +175,16 @@ input[type="checkbox"].hdr-input { width: auto; }
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  min-width: 1240px;
+  min-width: 1000px; /* fits the 1350px Zoho popup without sideways scrolling */
   table-layout: fixed;
 }
-.c-code { width: 74px; }
-.c-item { width: 380px; }
-.c-owner { width: 150px; }
-.c-status { width: 130px; }
-.c-date { width: 140px; }
-.c-risk { width: 96px; }
-.c-details { width: 330px; }
+.c-code { width: 56px; }
+.c-item { width: 290px; }
+.c-owner { width: 130px; }
+.c-status { width: 118px; }
+.c-date { width: 128px; }
+.c-risk { width: 78px; }
+.c-details { width: auto; /* takes the remaining width */ }
 
 .sheet thead th {
   position: sticky;            /* sticky column headings */
