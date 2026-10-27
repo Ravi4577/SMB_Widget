@@ -401,15 +401,18 @@
           return;
         }
         var kind = headerKind(meta);
-        var val = toHeaderValue(rec[meta.api_name], kind);
-        h.keys[key] = { meta: meta, kind: kind, original: val, current: val, display: displayValue(rec[meta.api_name]) };
+        var raw = rec[meta.api_name];
+        var val = toHeaderValue(raw, kind);
+        h.keys[key] = { meta: meta, kind: kind, original: val, current: val, display: displayValue(raw),
+                        lookupModule: kind === "lookup" ? lookupModuleOf(meta) : null };
+        log("header field", key, meta.api_name, meta.data_type, "->", kind);
       });
     }).catch(function (e) {
       state.configWarnings.push("Could not load header record: " + errMsg(e));
     });
   }
 
-  // Input kind for a CRM field: text | date | picklist | number | boolean | readonly
+  // Input kind for a CRM field: text | date | picklist | number | boolean | lookup | readonly
   function headerKind(meta) {
     if (meta.read_only || meta.field_read_only) return "readonly";
     switch (meta.data_type) {
@@ -418,13 +421,27 @@
       case "picklist": return "picklist";
       case "integer": case "bigint": case "double": case "currency": case "decimal": case "percent": return "number";
       case "boolean": return "boolean";
-      default: return "readonly"; // lookup, ownerlookup, datetime, multiselect, autonumber, formula…
+      case "lookup": return lookupModuleOf(meta) ? "lookup" : "readonly";
+      default: return "readonly"; // ownerlookup, datetime, multiselect, autonumber, formula…
     }
   }
 
+  function lookupModuleOf(meta) {
+    var m = meta.lookup && meta.lookup.module;
+    return m ? (m.api_name || (typeof m === "string" ? m : "")) : "";
+  }
+
+  // Display name of a record found through a lookup search.
+  function recordDisplayName(r) {
+    return r.Full_Name || r.Account_Name || r.Deal_Name || r.Vendor_Name || r.Product_Name || r.Name ||
+      [r.First_Name, r.Last_Name].filter(Boolean).join(" ") || r.id;
+  }
+
+  // Lookup values are kept as the related record id; the name is shown in the input.
   function toHeaderValue(v, kind) {
     if (kind === "boolean") return v === true ? "true" : "false";
     if (v == null) return "";
+    if (kind === "lookup") return v.id ? String(v.id) : "";
     if (kind === "date") return String(v).slice(0, 10);
     return String(v);
   }
@@ -447,6 +464,7 @@
     if (f.kind === "boolean") return f.current === "true";
     if (f.current === "") return null;
     if (f.kind === "number") return Number(f.current);
+    if (f.kind === "lookup") return { id: f.current };
     return f.current;
   }
 
@@ -697,7 +715,12 @@
       if (!f.meta) {
         html = '<input type="text" disabled' + attrs + ' title="' + esc(f.reason || "") + '">';
       } else if (f.kind === "readonly") {
-        html = '<span class="hdr-readonly" title="' + esc(f.meta.field_label + " (" + f.meta.api_name + ") – read-only here") + '">' + esc(f.display) + "</span>";
+        html = '<span class="hdr-readonly" title="' + esc(f.meta.field_label + " (" + f.meta.api_name + ", " + f.meta.data_type + ") – read-only here") + '">' + esc(f.display) + "</span>";
+      } else if (f.kind === "lookup") {
+        // Type to search the related module, then pick a record from the list.
+        html = '<div class="lk"><input type="text" autocomplete="off"' + attrs.replace('class="hdr-input"', 'class="hdr-input lk-input"') +
+          ' value="' + esc(f.display) + '" placeholder="" aria-autocomplete="list">' +
+          '<div class="lk-menu" hidden></div></div>';
       } else if (f.kind === "date") {
         html = '<input type="date"' + attrs + ' value="' + esc(f.current) + '">';
       } else if (f.kind === "number") {
@@ -721,9 +744,74 @@
     var key = e.target.getAttribute("data-hkey");
     var f = key && state.header.keys[key];
     if (!f || !f.meta) return;
+    if (f.kind === "lookup") { if (e.type === "input") lookupSearch(e.target, f); return; }
     f.current = e.target.type === "checkbox" ? String(e.target.checked) : e.target.value;
     e.target.closest(".txn-value").classList.toggle("is-dirty", f.current !== f.original);
     updateToolbar();
+  }
+
+  /* ---------- Lookup picker (header) ---------- */
+  var lookupTimer = null;
+  var lookupSeq = 0;
+
+  function lookupSearch(input, f) {
+    var menu = input.parentNode.querySelector(".lk-menu");
+    var text = input.value.trim();
+    clearTimeout(lookupTimer);
+    if (!text) { // cleared: the field will be emptied on save
+      setLookup(input, f, "", "");
+      menu.hidden = true;
+      return;
+    }
+    if (text.length < 2) { menu.hidden = true; return; }
+    lookupTimer = setTimeout(function () {
+      var seq = ++lookupSeq;
+      menu.hidden = false;
+      menu.innerHTML = '<div class="lk-empty">Searching…</div>';
+      ZOHO.CRM.API.searchRecord({ Entity: f.lookupModule, Type: "word", Query: text, page: 1, per_page: 10 })
+        .then(function (r) {
+          if (seq !== lookupSeq) return;
+          var rows = (r && Array.isArray(r.data)) ? r.data : [];
+          menu.innerHTML = rows.length
+            ? rows.map(function (rec) {
+                return '<div class="lk-item" data-id="' + esc(rec.id) + '">' + esc(recordDisplayName(rec)) + "</div>";
+              }).join("")
+            : '<div class="lk-empty">No ' + esc(f.lookupModule) + ' found</div>';
+        }, function (e) {
+          if (seq === lookupSeq) menu.innerHTML = '<div class="lk-empty">Search failed: ' + esc(errMsg(e)) + "</div>";
+        });
+    }, 300);
+  }
+
+  function setLookup(input, f, id, name) {
+    f.current = id;
+    f.display = name;
+    input.value = name;
+    input.closest(".txn-value").classList.toggle("is-dirty", f.current !== f.original);
+    updateToolbar();
+  }
+
+  function bindLookupPicker(container) {
+    // mousedown fires before the input's blur, so the pick is not lost.
+    container.addEventListener("mousedown", function (e) {
+      var item = e.target.closest(".lk-item");
+      if (!item) return;
+      e.preventDefault();
+      var input = item.closest(".lk").querySelector(".lk-input");
+      var f = state.header.keys[input.getAttribute("data-hkey")];
+      setLookup(input, f, item.getAttribute("data-id"), item.textContent);
+      item.parentNode.hidden = true;
+    });
+    // Leaving the box without picking restores the selected record's name.
+    container.addEventListener("focusout", function (e) {
+      if (!e.target.classList.contains("lk-input")) return;
+      var input = e.target;
+      var f = state.header.keys[input.getAttribute("data-hkey")];
+      setTimeout(function () {
+        input.parentNode.querySelector(".lk-menu").hidden = true;
+        if (input.value.trim() && input.value !== f.display) input.value = f.display;
+      }, 150);
+    });
   }
 
   function renderConfigBanners() {
@@ -859,6 +947,7 @@
     var hdr = document.querySelector(".txn-header");
     hdr.addEventListener("input", onHeaderEdit);
     hdr.addEventListener("change", onHeaderEdit);
+    bindLookupPicker(hdr);
 
     window.addEventListener("beforeunload", function (e) {
       if (totalDirty()) { e.preventDefault(); e.returnValue = ""; }
@@ -1062,13 +1151,8 @@
     var okN = o.created.length + o.updated.length;
     var hdrOk = o.header && o.header.ok;
     var hdrFail = o.header && !o.header.ok;
-    var html = [];
-    if (okN) {
-      html.push("<strong>Saved " + okN + " task(s)</strong> – " + o.created.length + " created, " + o.updated.length + " updated." +
-        "<ul><li>" + o.created.concat(o.updated).map(function (t) { return esc(t.code + " " + t.label); }).join("</li><li>") + "</li></ul>");
-    }
-    if (hdrOk) html.push("<strong>Transaction details saved</strong> to the " + esc(state.header.entity) + " record.");
-    if (okN || hdrOk) addBanner("ok", html.join(""), { id: "save-result", html: true, dismissible: true });
+    // Successful saves show no banner: rows simply lose their unsaved marker.
+    log("saved", { tasks: okN, header: !!hdrOk });
     removeBanner("save-failed");
     if (o.failed.length || hdrFail) {
       var items = o.failed.map(function (f) { return esc(f.task.code + " " + f.task.label + ": " + f.message); });
@@ -1084,7 +1168,6 @@
         while (p) { state.expanded[p] = true; p = state.tasks[p].parentCode; }
       });
     }
-    if (!okN && !o.header && !o.failed.length) addBanner("info", "No changes needed saving.", { id: "save-result" });
   }
 
   /* ==================================================================
@@ -1096,7 +1179,7 @@
     var wantsMock = window.top === window.self && /[?&]mock=1\b/.test(location.search);
     if (!wantsMock) return start();
     var s = document.createElement("script");
-    s.src = "../dev/mock-zoho-sdk.js";
+    s.src = "../dev/mock-zoho-sdk.js?t=" + Date.now();
     s.onload = start;
     s.onerror = function () { start(); };
     document.body.appendChild(s);

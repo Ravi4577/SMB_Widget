@@ -43,12 +43,17 @@
     return m;
   });
 
-  // Parent Deal: Seller (text), Buyer (text), Closing Date (date), Location (text)
+  // Parent Deal: Seller + Buyer (Contacts lookups), Closing Date (date), Location (text)
   var DEAL_FIELDS = [
-    { api_name: "Seller", field_label: "Seller Name", data_type: "text", length: 255 },
-    { api_name: "Buyer", field_label: "Buyer", data_type: "text", length: 255 },
+    { api_name: "Seller", field_label: "Seller", data_type: "lookup", lookup: { module: { api_name: "Contacts" } } },
+    { api_name: "Buyer", field_label: "Buyer", data_type: "lookup", lookup: { module: { api_name: "Contacts" } } },
     { api_name: "Closing_Date", field_label: "Closing Date", data_type: "date" },
     { api_name: "Location", field_label: "Location", data_type: "text", length: 255 }
+  ];
+
+  var CONTACTS = [
+    { id: "c1", Full_Name: "James McCarthy" }, { id: "c2", Full_Name: "Sarah Cherry" },
+    { id: "c3", Full_Name: "Sarah Connor" }, { id: "c4", Full_Name: "David Lee" }
   ];
 
   function write(isNew, cfg) {
@@ -110,6 +115,10 @@
       API: {
         getAllRecords: function (cfg) { return page(load().records, cfg); },
         searchRecord: function (cfg) {
+          if (cfg.Type === "word") {
+            var q = String(cfg.Query || "").toLowerCase();
+            return delay({ data: CONTACTS.filter(function (c) { return c.Full_Name.toLowerCase().indexOf(q) !== -1; }), info: { more_records: false } });
+          }
           var m = /^\((\w+):(equals|starts_with):(.*)\)$/.exec(cfg.Query || "");
           var rows = load().records.filter(function (r) {
             if (!m) return false;
@@ -122,7 +131,7 @@
         getRecord: function (cfg) {
           if (cfg.Entity === "Deals") {
             var db = load();
-            db.deal = db.deal || { Seller: "Smith Family Dental", Buyer: "Bright Smiles Holdings", Closing_Date: "2026-12-15", Location: null };
+            db.deal = db.deal || { Seller: { id: "c1", name: "James McCarthy" }, Buyer: { id: "c2", name: "Sarah Cherry" }, Closing_Date: "2026-12-15", Location: null };
             save(db);
             return delay({ data: [Object.assign({ id: cfg.RecordID }, clone(db.deal))] });
           }

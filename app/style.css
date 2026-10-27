@@ -125,7 +125,7 @@ html, body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid var(--grid);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: visible; position: relative; z-index: 5;
 }
 .txn-cell {
   display: flex;
@@ -150,8 +150,8 @@ html, body {
   width: 100%;
   font: 13px var(--font);
   color: var(--text);
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid #e3e3e3; /* visible so the box reads as editable */
+  background: #fff;
   border-radius: 4px;
   padding: 5px 8px;
   outline: none;
@@ -225,7 +225,7 @@ input[type="checkbox"].hdr-input { width: auto; }
 .phase-meta { font-weight: 500; font-size: 11.5px; color: #555; margin-left: 10px; }
 
 /* Task rows */
-.cell-code { color: var(--muted); font-size: 12px; font-family: var(--font-alt); padding-left: 10px !important; }
+.cell-code { color: var(--text); font-size: 12px; font-family: var(--font-alt); padding-left: 10px !important; }
 .cell-item { display: flex; align-items: center; gap: 4px; min-height: 30px; }
 .item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .depth-1 .item-label { font-weight: 500; }
@@ -285,7 +285,7 @@ input[type="checkbox"].hdr-input { width: auto; }
 }
 .sheet textarea:focus { height: 64px; }
 .sheet .invalid { border-color: var(--error) !important; background: #fff !important; }
-select.placeholder { color: var(--muted); }
+select.placeholder { color: var(--text); }
 
 .risk-yes { color: var(--error) !important; font-weight: 600; }
 .status-complete { color: var(--ok) !important; font-weight: 600; }
@@ -344,3 +344,16 @@ select.placeholder { color: var(--muted); }
   .toolbar { width: 100%; }
   .toolbar .btn { flex: 1 1 auto; }
 }
+
+/* ---------- Lookup picker (header) ---------- */
+.lk { position: relative; width: 100%; }
+.lk-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 2px);
+  background: #fff; border: 1px solid var(--grid); border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  max-height: 220px; overflow: auto; z-index: 20;
+}
+.lk-menu[hidden] { display: none; }
+.lk-item { padding: 7px 10px; cursor: pointer; }
+.lk-item:hover { background: #eef4fb; }
+.lk-empty { padding: 7px 10px; color: var(--muted); }
