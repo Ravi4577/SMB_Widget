@@ -571,39 +571,29 @@
     });
   }
 
-  // Map CRM records to task codes, for the Deal the widget was opened from.
-  //   1. Name = Deal name and Task_Code set           (current format)
-  //   2. Name = "<Deal name> - SMB-LOI-1.3.3"          (earlier format)
-  //   3. Name = "SMB-LOI-1.3.3", no Deal name          (first format)
-  // A better tier wins for the same code. Records of other Deals are left
-  // out, so each Deal keeps its own checklist. Returns { byCode, dupes, others }.
+  // Map CRM records to task codes. All Deals share ONE checklist: a task is
+  // identified only by its code, whichever Deal saved it, so a change made
+  // from any Deal shows in every Deal.
+  // The code comes from Task_Code, or, for records saved before that field
+  // existed, from the old Name format ("SMB-LOI-1.3.3" / "<Deal> - SMB-LOI-1.3.3").
+  // If several records hold the same code (e.g. each Deal saved its own copy
+  // earlier), the most recently modified one is shown and updated; the others
+  // are left untouched in CRM. Returns { byCode, dupes, others }.
   function indexRecords(rows) {
-    var deal = dealName();
-    var tiers = [{}, {}, {}];
-    var dupes = [], others = [];
-    function keep(map, code, r) {
-      if (map[code]) {
-        dupes.push(code);
-        if (String(r.Modified_Time || "") > String(map[code].Modified_Time || "")) map[code] = r;
-      } else {
-        map[code] = r;
-      }
-    }
+    var byCode = {}, dupes = [], others = [];
     rows.forEach(function (r) {
       var name = String(r[F.name] || "");
       var tc = r[TF.code] == null ? "" : String(r[TF.code]).trim();
       var m = LEGACY_NAME.exec(name);
-      if (tc && (!deal || name === deal)) return keep(tiers[0], tc, r);
-      if (m && m[0] !== name) {
-        var prefix = name.slice(0, name.length - m[0].length);
-        if (!deal || prefix === deal) return keep(tiers[1], m[1], r);
-      } else if (m && !tc) {
-        return keep(tiers[2], m[1], r);
+      var code = tc || (m && m[1]) || "";
+      if (!code || !state.tasks[code]) { others.push(r); return; } // not a task record
+      if (byCode[code]) {
+        if (dupes.indexOf(code) === -1) dupes.push(code);
+        if (String(r.Modified_Time || "") > String(byCode[code].Modified_Time || "")) byCode[code] = r;
+      } else {
+        byCode[code] = r;
       }
-      others.push(r); // another Deal's record, or not a task record
     });
-    var byCode = {};
-    [2, 1, 0].forEach(function (i) { Object.keys(tiers[i]).forEach(function (c) { byCode[c] = tiers[i][c]; }); });
     return { byCode: byCode, dupes: dupes, others: others };
   }
 
@@ -1309,8 +1299,9 @@
   function updatePayload(t) {
     var p = { id: t.recordId };
     changedKeys(t).forEach(function (k) { p[F[k]] = crmValue(k, t.current[k]); });
-    // Records saved with an older Name ("… SMB-LOI-1.2") get the Deal name when edited.
-    if (t.crmName !== recordName(t)) p[F.name] = recordName(t);
+    // Only records still carrying the old "…SMB-LOI-1.2" Name are renamed;
+    // a shared record keeps the Deal name it was created with.
+    if (t.crmName && LEGACY_NAME.test(t.crmName)) p[F.name] = recordName(t);
     var tf = taskFieldValues(t);
     var crm = t.crm || {};
     if (crm.phase !== tf[TF.phase]) p[TF.phase] = tf[TF.phase];
