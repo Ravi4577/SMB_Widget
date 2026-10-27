@@ -42,8 +42,8 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px 20px 12px;
-  gap: 12px;
+  padding: 6px 8px 6px;
+  gap: 8px;
 }
 
 /* ---------- Title + toolbar ---------- */

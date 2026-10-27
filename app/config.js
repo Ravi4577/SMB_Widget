@@ -167,8 +167,8 @@
       resize: true,
       width: 10000,        // no fixed cap: the popup fills the screen minus the margins below
       height: 10000,
-      marginX: 60,         // px left free for the CRM page edges
-      marginY: 170         // px left free for browser toolbar + popup title bar
+      marginX: 16,         // px left free for the CRM page edges
+      marginY: 110         // px left free for browser toolbar + popup title bar
     },
 
     api: {
