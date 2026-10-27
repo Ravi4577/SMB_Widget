@@ -25,12 +25,24 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 New-Item -ItemType Directory -Force $dist | Out-Null
 if (Test-Path $zip) { Remove-Item $zip -Force }
+# Zoho's widget file server does not serve "style.css?v=..." as text/css,
+# and browsers refuse such a stylesheet, so the ZIP copy of index.html has
+# no ?v= query strings (each Zoho upload is a fresh copy anyway).
+$zipHtml = [regex]::Replace($html, '\?v=[^"]*"', '"')
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
 $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
 try {
   Get-ChildItem $app -File -Recurse | ForEach-Object {
     $rel = $_.FullName.Substring($app.Length + 1).Replace('\', '/')
     foreach ($name in @($rel, "app/$rel")) {
-      [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $name, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+      if ($rel -eq "index.html") {
+        $entry = $archive.CreateEntry($name, [IO.Compression.CompressionLevel]::Optimal)
+        $writer = New-Object IO.StreamWriter($entry.Open(), $utf8)
+        try { $writer.Write($zipHtml) } finally { $writer.Dispose() }
+      } else {
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $name, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+      }
     }
   }
   [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, (Join-Path $root "plugin-manifest.json"), "plugin-manifest.json", [IO.Compression.CompressionLevel]::Optimal) | Out-Null
