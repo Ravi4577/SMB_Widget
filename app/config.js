@@ -41,7 +41,12 @@
     // when the record does not hold these values yet).
     taskFields: {
       phase: "Phase_Items", // Picklist: Letter of Intent | Under Contract | Real Estate | Closing
-      subItem: "Sub_Items"  // Single Line: deepest selected task / subitem name
+      subItem: "Sub_Items", // Single Line: deepest selected task / subitem name
+      // Single Line holding the task's hierarchy code (e.g. "1.3.3"). This is
+      // how a record is matched to its task, since the record Name is just
+      // the Deal name and several tasks share a label. Can be hidden from
+      // the layout; it must exist in the module.
+      code: "Task_Code"
     },
 
     // LEGACY – the per-phase Single Line fields used before Phase_Items /

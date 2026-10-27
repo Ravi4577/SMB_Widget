@@ -34,6 +34,7 @@
     ["Introduction_to_Client_s_CPA", "text"], ["Introduce_Client_to_M_A_Attorney", "text"], ["Data_Room_Access_Updated", "text"],
     ["Phase_Items", "picklist", ["-None-", "Letter of Intent", "Under Contract", "Real Estate", "Closing"]],
     ["Sub_Items", "text"],
+    ["Task_Code", "text"],
     ["Escrow_Account", "picklist", ["-None-", "Escrow Account"]],
     ["Escrow_Account_Sub_Item", "picklist", ["-None-", "Escrow Initiated / Contact Information Shared", "Escrow Instructions Shared / Signed / Fee Paid", "Earnest Money Deposit (Initial)", "Earnest Money Deposit (Subsequent)"]],
     ["Letter_of_intent_Subitem", "picklist", ["-None-", "LOI Executed Date", "Introduction to Client's CPA", "Escrow Account", "Introduce Client to M&A Attorney", "Data Room Access Updated"]],
