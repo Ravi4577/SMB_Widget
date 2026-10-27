@@ -45,6 +45,8 @@
     picklistSkips: {},  // "field|value" -> true (diagnostics)
     phaseValues: {},    // phase key -> exact Phase_Items picklist value
     subItemMaxLength: 255,
+    nameMaxLength: 120,
+    txnName: "",        // name of the record the widget was opened from (e.g. the Deal)
     configErrors: [],   // blocking problems: saving disabled
     configWarnings: [],
     txn: { mode: CONFIG.transactionLink.mode, parentId: null, parentModule: CONFIG.transactionLink.parentModule },
@@ -160,11 +162,32 @@
     return { owner: "", status: "", dueDate: "", completeDate: "", atRisk: "", taskDetails: "" };
   }
 
-  function recordName(task) {
+  // Stable task key, e.g. "SMB-LOI-1.3.3". This is what identifies a record's
+  // task; labels are not unique (e.g. "Lease Finalized" exists twice).
+  function taskKey(task) {
     var parts = [CONFIG.naming.prefix];
     if (state.txn.mode === "name_prefix") parts.push(state.txn.parentId);
     parts.push(task.phaseKey, task.code);
     return parts.join("-");
+  }
+
+  // Record Name: "<Deal name> - SMB-LOI-1.3.3" when the widget was opened from
+  // a record (the Deal name is shortened if needed; the task key never is),
+  // otherwise just the task key.
+  var NAME_SEP = " - ";
+  var KEY_BUDGET = 20; // longest task key is "SMB-RE-3.3.1.1" (14)
+  function dealPrefix() {
+    if (!state.txnName || state.txn.mode === "name_prefix") return "";
+    var room = state.nameMaxLength - NAME_SEP.length - KEY_BUDGET;
+    var deal = state.txnName.length > room ? state.txnName.slice(0, Math.max(0, room - 1)).trim() + "…" : state.txnName;
+    return deal + NAME_SEP;
+  }
+  function recordName(task) { return dealPrefix() + taskKey(task); }
+
+  // Task key at the end of a record Name ("… - SMB-LOI-1.3.3" or "SMB-LOI-1.3.3").
+  function keyFromName(name) {
+    var i = name.lastIndexOf(NAME_SEP);
+    return i === -1 ? name : name.slice(i + NAME_SEP.length);
   }
 
   function isDirty(task) {
@@ -337,6 +360,8 @@
           else state.configWarnings.push(TF.phase + " picklist has no value \"" + p.label + "\" – " + p.label + " tasks cannot be saved.");
         });
       }
+      var nameMeta = state.fieldsMeta[F.name];
+      state.nameMaxLength = (nameMeta && nameMeta.length) || 120;
       var subMeta = state.fieldsMeta[TF.subItem];
       state.subItemMaxLength = (subMeta && subMeta.length) || 255;
 
@@ -400,6 +425,7 @@
     function localValue(key) { return prev[key] && !prev[key].meta ? prev[key].current || "" : ""; }
     var h = { entity: null, id: null, keys: {} };
     state.header = h;
+    state.txnName = "";
     HEADER_KEYS.forEach(function (k) { h.keys[k[0]] = { meta: null, current: localValue(k[0]), reason: "Widget not opened from a record" }; });
 
     if (state.txn.parentId && state.txn.parentModule) {
@@ -411,6 +437,7 @@
 
     return Promise.all([CRM.getRecord(h.entity, h.id), CRM.getFields(h.entity)]).then(function (res) {
       var rec = res[0];
+      state.txnName = String(recordDisplayName(rec) || "").trim();
       var byApi = {};
       res[1].forEach(function (f) { byApi[f.api_name] = f; });
       HEADER_KEYS.forEach(function (pair) {
@@ -460,10 +487,13 @@
     return m ? (m.api_name || (typeof m === "string" ? m : "")) : "";
   }
 
-  // Display name of a record found through a lookup search.
+  // Display name of a record (Deal, Contact, Account, …). Only plain strings
+  // count, so a Deal's Account_Name lookup object is never taken as its name.
   function recordDisplayName(r) {
-    return r.Full_Name || r.Account_Name || r.Deal_Name || r.Vendor_Name || r.Product_Name || r.Name ||
-      [r.First_Name, r.Last_Name].filter(Boolean).join(" ") || r.id;
+    var names = [r.Deal_Name, r.Full_Name, r.Account_Name, r.Vendor_Name, r.Product_Name, r.Name,
+      [r.First_Name, r.Last_Name].filter(Boolean).join(" ")];
+    for (var i = 0; i < names.length; i++) if (typeof names[i] === "string" && names[i].trim()) return names[i].trim();
+    return r.id;
   }
 
   // Lookup values are kept as the related record id; the name is shown in the input.
@@ -546,21 +576,33 @@
     });
   }
 
-  // Map CRM records to tasks by exact record Name. Returns map name -> record.
+  // Map CRM records to task keys. A record named for this Deal wins; a record
+  // with only the bare key (saved before Deal names were added) is used when
+  // the Deal has none yet. Records named for another Deal are left out, so
+  // each Deal keeps its own checklist. Returns { byKey, dupes, others }.
   function indexRecords(rows) {
-    var byName = {};
-    var dupes = [];
+    var mine = {}, legacy = {}, dupes = [], others = [];
+    var prefix = dealPrefix() || null;
+    function keep(map, key, r) {
+      if (map[key]) {
+        dupes.push(key);
+        if (String(r.Modified_Time || "") > String(map[key].Modified_Time || "")) map[key] = r;
+      } else {
+        map[key] = r;
+      }
+    }
     rows.forEach(function (r) {
       var name = r[F.name];
       if (!name) return;
-      if (byName[name]) {
-        dupes.push(name);
-        if (String(r.Modified_Time || "") > String(byName[name].Modified_Time || "")) byName[name] = r;
-      } else {
-        byName[name] = r;
-      }
+      var key = keyFromName(name);
+      if (key === name) keep(legacy, key, r);               // bare "SMB-LOI-1.1"
+      else if (!prefix || name.indexOf(prefix) === 0) keep(mine, key, r);
+      else others.push(r);                                   // another Deal's record
     });
-    return { byName: byName, dupes: dupes };
+    var byKey = {};
+    Object.keys(legacy).forEach(function (k) { byKey[k] = legacy[k]; });
+    Object.keys(mine).forEach(function (k) { byKey[k] = mine[k]; });
+    return { byKey: byKey, dupes: dupes, others: others };
   }
 
   function recordToValues(r) {
@@ -598,24 +640,28 @@
     state.duplicates = [];
     state.taskOrder.forEach(function (code) {
       var t = state.tasks[code];
-      var name = recordName(t);
-      known[name] = true;
-      var rec = idx.byName[name];
+      var key = taskKey(t);
+      known[key] = true;
+      var rec = idx.byKey[key];
       var stillDirty = keepEdits && isDirty(t);
       if (rec) {
         t.recordId = rec.id;
         t.original = recordToValues(rec);
         readTaskFields(t, rec);
+        t.crmName = rec[F.name];
         if (!stillDirty) t.current = recordToValues(rec);
       } else {
         t.recordId = null;
         t.crm = null;
+        t.crmName = null;
         t.original = emptyValues();
         if (!stillDirty) t.current = emptyValues();
       }
-      if (idx.dupes.indexOf(name) !== -1) state.duplicates.push(code);
+      if (idx.dupes.indexOf(key) !== -1) state.duplicates.push(code);
     });
-    state.unrecognized = rows.filter(function (r) { return !known[r[F.name]]; });
+    state.unrecognized = rows.filter(function (r) {
+      return r[F.name] && !known[keyFromName(r[F.name])] && idx.others.indexOf(r) === -1;
+    });
 
     // Expand items that hold saved data so it is visible on load.
     state.taskOrder.forEach(function (code) {
@@ -1137,6 +1183,8 @@
   function updatePayload(t) {
     var p = { id: t.recordId };
     changedKeys(t).forEach(function (k) { p[F[k]] = crmValue(k, t.current[k]); });
+    // Older records named only "SMB-…" get this Deal's name when edited.
+    if (t.crmName !== recordName(t)) p[F.name] = recordName(t);
     var tf = taskFieldValues(t);
     var crm = t.crm || {};
     if (crm.phase !== tf[TF.phase]) p[TF.phase] = tf[TF.phase];
@@ -1171,8 +1219,8 @@
       ? fetchTaskRecords().then(function (rows) {
           var idx = indexRecords(rows);
           valid.forEach(function (t) {
-            var rec = !t.recordId && idx.byName[recordName(t)];
-            if (rec) { t.recordId = rec.id; t.original = recordToValues(rec); readTaskFields(t, rec); }
+            var rec = !t.recordId && idx.byKey[taskKey(t)];
+            if (rec) { t.recordId = rec.id; t.original = recordToValues(rec); readTaskFields(t, rec); t.crmName = rec[F.name]; }
           });
         })
       : Promise.resolve();
@@ -1197,6 +1245,7 @@
             if (r.ok) {
               if (isNew) t.recordId = r.id || t.recordId;
               t.original = sent; // what CRM now holds for the fields we sent
+              t.crmName = recordName(t);
               var tf = taskFieldValues(t);
               t.crm = { phase: tf[TF.phase], subItem: tf[TF.subItem], legacySubItem: (t.crm || {}).legacySubItem || "" };
             } else if (/Phase_Items/.test(r.message || "")) {

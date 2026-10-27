@@ -65,7 +65,8 @@
     if (cfg.Entity === "Deals") {
       if (Math.random() < failRate) return delay({ data: [{ code: "INTERNAL_ERROR", status: "error", message: "Mock API failure", details: {} }] });
       var d = load();
-      Object.keys(data).forEach(function (k) { if (k !== "id") d.deal[k] = data[k]; });
+      d.deals = d.deals || {}; d.deals[data.id] = d.deals[data.id] || {};
+      Object.keys(data).forEach(function (k) { if (k !== "id") d.deals[data.id][k] = data[k]; });
       save(d);
       return delay({ data: [{ code: "SUCCESS", status: "success", message: "record updated", details: { id: data.id } }] });
     }
@@ -135,9 +136,10 @@
         getRecord: function (cfg) {
           if (cfg.Entity === "Deals") {
             var db = load();
-            db.deal = db.deal || { Seller: { id: "c1", name: "James McCarthy" }, Buyer: { id: "c2", name: "Sarah Cherry" }, Closing_Date: "2026-12-15", Location: null };
+            db.deals = db.deals || {};
+            db.deals[cfg.RecordID] = db.deals[cfg.RecordID] || { Deal_Name: cfg.RecordID === "7344" ? "ACRA MEDICAL AESTHETICS, LLC" : "Deal " + cfg.RecordID, Seller: { id: "c1", name: "James McCarthy" }, Buyer: { id: "c2", name: "Sarah Cherry" }, Closing_Date: "2026-12-15", Location: null };
             save(db);
-            return delay({ data: [Object.assign({ id: cfg.RecordID }, clone(db.deal))] });
+            return delay({ data: [Object.assign({ id: cfg.RecordID }, clone(db.deals[cfg.RecordID]))] });
           }
           var r = load().records.filter(function (x) { return x.id === String(cfg.RecordID); })[0];
           return delay(r ? { data: [clone(r)] } : {});
