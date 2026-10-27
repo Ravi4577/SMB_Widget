@@ -249,10 +249,18 @@
     if (!ui.resize || !ZOHO.CRM || !ZOHO.CRM.UI || typeof ZOHO.CRM.UI.Resize !== "function") return;
     var w = Math.round(Math.min(ui.width, (window.screen.availWidth || 1400) - (ui.marginX || 0)));
     var h = Math.round(Math.min(ui.height, (window.screen.availHeight || 900) - (ui.marginY || 0)));
-    try {
-      Promise.resolve(ZOHO.CRM.UI.Resize({ width: String(w), height: String(h) }))
-        .catch(function (e) { log("resize failed", e); });
-    } catch (e) { log("resize failed", e); }
+    // Asked once on PageLoad and again after the first render, since CRM may
+    // still be laying out the popup on the first call. Result is logged
+    // (true/false) so a CRM-side size cap can be seen in the console.
+    [0, 1500].forEach(function (delay) {
+      setTimeout(function () {
+        try {
+          Promise.resolve(ZOHO.CRM.UI.Resize({ width: w, height: h }))
+            .then(function (ok) { log("resize", w + "x" + h, "->", ok, "viewport now", window.innerWidth + "x" + window.innerHeight); },
+                  function (e) { log("resize failed", e); });
+        } catch (e) { log("resize failed", e); }
+      }, delay);
+    });
   }
 
   function loadEverything() {
