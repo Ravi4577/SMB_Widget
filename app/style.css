@@ -179,10 +179,10 @@ input[type="checkbox"].hdr-input { width: auto; }
   table-layout: fixed;
 }
 .c-code { width: 56px; }
-.c-item { width: 290px; }
+.c-item { width: 270px; }
 .c-owner { width: 130px; }
 .c-status { width: 118px; }
-.c-date { width: 128px; }
+.c-date { width: 138px; }
 .c-risk { width: 78px; }
 .c-details { width: auto; /* takes the remaining width */ }
 
@@ -358,3 +358,8 @@ select.placeholder { color: var(--text); }
 .lk-item:hover { background: #eef4fb; }
 .lk-empty { padding: 7px 10px; color: var(--muted); }
 .hdr-note { padding: 5px 8px; font-size: 11.5px; color: var(--error); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Items with subitems are headings: no inputs, click to expand */
+.row-parent td { cursor: pointer; user-select: none; }
+.row-parent .item-label { font-weight: 600; }
+.row-parent .cell-item { min-height: 36px; }

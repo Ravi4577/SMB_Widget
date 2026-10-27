@@ -173,7 +173,8 @@
   }
 
   function dirtyTasks() {
-    return state.taskOrder.map(function (c) { return state.tasks[c]; }).filter(isDirty);
+    return state.taskOrder.map(function (c) { return state.tasks[c]; })
+      .filter(function (t) { return !t.childCodes.length && isDirty(t); });
   }
 
   /* ==================================================================
@@ -608,9 +609,11 @@
     PHASES.forEach(function (phase) {
       var open = !!state.expanded["P:" + phase.key];
       var codes = state.taskOrder.filter(function (c) { return state.tasks[c].phaseKey === phase.key; });
-      var saved = 0, complete = 0, risk = 0;
+      var saved = 0, complete = 0, risk = 0, leaves = 0;
       codes.forEach(function (c) {
         var t = state.tasks[c];
+        if (!isLeaf(t)) return; // parent items are headings, not tasks
+        leaves++;
         if (t.recordId) saved++;
         if (t.original.status === CONFIG.options.completeStatus) complete++;
         if (t.original.atRisk === "Yes") risk++;
@@ -621,7 +624,7 @@
           '<td colspan="7"><div class="cell-item">' +
             '<button type="button" class="toggle" data-toggle="P:' + phase.key + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(phase.label) + '">' + CHEVRON + '</button>' +
             '<span>' + esc(phase.label) + '</span>' +
-            '<span class="phase-meta">' + saved + ' of ' + codes.length + ' tracked · ' + complete + ' complete' + (risk ? ' · <span class="err-text">' + risk + ' at risk</span>' : '') + '</span>' +
+            '<span class="phase-meta">' + saved + ' of ' + leaves + ' tracked · ' + complete + ' complete' + (risk ? ' · <span class="err-text">' + risk + ' at risk</span>' : '') + '</span>' +
           '</div></td>' +
         '</tr>'
       );
@@ -660,7 +663,21 @@
 
   function inv(t, k) { return t.invalidKeys[k] ? " invalid" : ""; }
 
+  // Items that have subitems are headings: only their subitems hold data.
+  function isLeaf(t) { return !t.childCodes.length; }
+
+  function parentRowHtml(t) {
+    var open = !!state.expanded[t.code];
+    return '<tr class="row-task row-parent depth-' + t.depth + '" data-code="' + esc(t.code) + '" title="' + esc(t.phaseLabel + " › " + t.label) + '">' +
+      '<td class="cell-code">' + esc(t.code) + '</td>' +
+      '<td colspan="7"><div class="cell-item">' +
+        '<button type="button" class="toggle" data-toggle="' + esc(t.code) + '" aria-expanded="' + open + '" aria-label="Toggle ' + esc(t.label) + '">' + CHEVRON + '</button>' +
+        '<span class="item-label">' + esc(t.label) + '</span></div></td>' +
+    '</tr>';
+  }
+
   function taskRowHtml(t) {
+    if (!isLeaf(t)) return parentRowHtml(t);
     var v = t.current;
     var open = !!state.expanded[t.code];
     var toggle = t.childCodes.length
@@ -934,7 +951,10 @@
     body.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-toggle]");
       var phaseRow = e.target.closest(".row-phase");
-      var key = btn ? btn.getAttribute("data-toggle") : (phaseRow ? "P:" + phaseRow.getAttribute("data-phase") : null);
+      var parentRow = e.target.closest(".row-parent");
+      var key = btn ? btn.getAttribute("data-toggle")
+        : phaseRow ? "P:" + phaseRow.getAttribute("data-phase")
+        : parentRow ? parentRow.getAttribute("data-code") : null;
       if (!key) return;
       state.expanded[key] = !state.expanded[key];
       renderSheet();
