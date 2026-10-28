@@ -294,6 +294,12 @@
       .then(resolveTransaction)
       .then(loadHeader)
       .then(function () {
+        // Opened from a Deal but its name could not be read: never fall back
+        // to showing or saving other Deals' tasks.
+        var pd = state.pageData || {};
+        if (pd.Entity && pd.Entity !== state.moduleApi && first(pd.EntityId) && !state.txnName) {
+          state.configErrors.push("Could not read the name of this " + pd.Entity + " record, so its tasks cannot be loaded.");
+        }
         if (state.configErrors.length) return null;
         return fetchTaskRecords().then(applyRecords);
       })
@@ -571,22 +577,32 @@
     });
   }
 
-  // Map CRM records to task codes. All Deals share ONE checklist: a task is
-  // identified only by its code, whichever Deal saved it, so a change made
-  // from any Deal shows in every Deal.
-  // The code comes from Task_Code, or, for records saved before that field
-  // existed, from the old Name format ("SMB-LOI-1.3.3" / "<Deal> - SMB-LOI-1.3.3").
-  // If several records hold the same code (e.g. each Deal saved its own copy
-  // earlier), the most recently modified one is shown and updated; the others
-  // are left untouched in CRM. Returns { byCode, dupes, others }.
+  // Map CRM records to task codes for the Deal the widget was opened from.
+  // Every Deal has its OWN checklist: only records whose Name is this Deal's
+  // name are used, so a Deal with no saved tasks opens empty and saves create
+  // records under its own name.
+  //   - current format: Name = Deal name, code in Task_Code
+  //   - earlier format: Name = "<Deal name> - SMB-LOI-1.3.3" (renamed on edit)
+  //   - first format "SMB-LOI-1.3.3" has no Deal, so it is only used when the
+  //     widget is not opened from a Deal.
+  // If one Deal has several records for a code, the most recently modified is
+  // shown and updated. Returns { byCode, dupes, others }.
   function indexRecords(rows) {
+    var deal = dealName();
     var byCode = {}, dupes = [], others = [];
     rows.forEach(function (r) {
-      var name = String(r[F.name] || "");
+      var name = String(r[F.name] || "").trim();
       var tc = r[TF.code] == null ? "" : String(r[TF.code]).trim();
       var m = LEGACY_NAME.exec(name);
-      var code = tc || (m && m[1]) || "";
-      if (!code || !state.tasks[code]) { others.push(r); return; } // not a task record
+      var code = "";
+      if (tc && (!deal || name === deal)) {
+        code = tc;
+      } else if (m && m[0] !== name) {
+        if (!deal || name.slice(0, name.length - m[0].length).trim() === deal) code = m[1];
+      } else if (m && !deal) {
+        code = m[1];
+      }
+      if (!code || !state.tasks[code]) { others.push(r); return; } // another Deal's record
       if (byCode[code]) {
         if (dupes.indexOf(code) === -1) dupes.push(code);
         if (String(r.Modified_Time || "") > String(byCode[code].Modified_Time || "")) byCode[code] = r;
@@ -1299,8 +1315,7 @@
   function updatePayload(t) {
     var p = { id: t.recordId };
     changedKeys(t).forEach(function (k) { p[F[k]] = crmValue(k, t.current[k]); });
-    // Only records still carrying the old "…SMB-LOI-1.2" Name are renamed;
-    // a shared record keeps the Deal name it was created with.
+    // Records still carrying the old "<Deal> - SMB-LOI-1.2" Name get the plain Deal name.
     if (t.crmName && LEGACY_NAME.test(t.crmName)) p[F.name] = recordName(t);
     var tf = taskFieldValues(t);
     var crm = t.crm || {};

@@ -23,7 +23,7 @@ SMB Widget/
 
 | Topic | Behaviour |
 |---|---|
-| Record per task | Record `Name` = the Deal the task was first saved from (e.g. `ACRA MEDICAL AESTHETICS, LLC`). `Task_Code` holds the task code (e.g. `1.3.3`) and is how a record is matched to its task. **All Deals share one checklist**: a task saved from any Deal shows in every Deal. If several records exist for one code, the most recently modified is shown and updated. |
+| Record per task | Record `Name` = the Deal name (e.g. `ACRA MEDICAL AESTHETICS, LLC`) and `Task_Code` = the task code (e.g. `1.3.3`). **Each Deal has its own checklist**: the widget shows and updates only records whose Name is the opened Deal's name, so a new Deal opens empty and its saves are stored under its own name. |
 | Phase / task fields | Every create writes `Phase_Items` (picklist: the main phase, validated against CRM's permitted values) and `Sub_Items` (the deepest selected task name, never truncated). The old per-phase fields `Letter_of_Intent`, `Under_Contract`, `Real_Estate` and `Closing` are no longer written. Records saved earlier still load (they are matched by `Name`), and editing one fills in `Phase_Items` / `Sub_Items` without clearing the old field. |
 | Task fields | `Owner1`, `Status`, `Due_Date`, `Complete_Date` (YYYY-MM-DD), `At_Risk`, `Task_Details`. |
 | Create vs update | Tasks that have no record are **created**. Tasks that have a record are **updated by record ID**, and only the fields that changed are sent. |
