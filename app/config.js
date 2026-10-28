@@ -142,8 +142,13 @@
      * ------------------------------------------------------------------ */
     header: {
       // Deals API names confirmed by the client (2026-10-26).
-      sellerName:  { field: "Seller",       labels: ["Seller / Practice Name", "Seller Name", "Practice Name", "Seller"] },
-      buyerName:   { field: "Buyer",        labels: ["Buyer / Company Name", "Buyer Name", "Buyer Company Name", "Buyer Company", "Buyer"] },
+      // lookupFilter mirrors the CRM lookup filter (Deals > Seller / Buyer:
+      // "Contact Type IS Seller / Buyer"), so the search lists the same people
+      // as CRM does. The field is found by its label in the lookup module.
+      sellerName:  { field: "Seller",       labels: ["Seller / Practice Name", "Seller Name", "Practice Name", "Seller"],
+                     lookupFilter: { fieldLabel: "Contact Type", value: "Seller" } },
+      buyerName:   { field: "Buyer",        labels: ["Buyer / Company Name", "Buyer Name", "Buyer Company Name", "Buyer Company", "Buyer"],
+                     lookupFilter: { fieldLabel: "Contact Type", value: "Buyer" } },
       closingDate: { field: "Closing_Date", labels: ["Closing Date"] },
       location:    { field: "Location",     labels: ["Location"] }
     },

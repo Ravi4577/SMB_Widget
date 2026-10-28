@@ -57,8 +57,13 @@
   if (qs.get("noloc") === "1") DEAL_FIELDS = DEAL_FIELDS.filter(function (f) { return f.api_name !== "Location"; });
 
   var CONTACTS = [
-    { id: "c1", Full_Name: "James McCarthy" }, { id: "c2", Full_Name: "Sarah Cherry" },
-    { id: "c3", Full_Name: "Sarah Connor" }, { id: "c4", Full_Name: "David Lee" }
+    { id: "c1", Full_Name: "James McCarthy", Contact_Type: "Seller" }, { id: "c2", Full_Name: "Sarah Cherry", Contact_Type: "Buyer" },
+    { id: "c3", Full_Name: "Sarah Connor", Contact_Type: "Seller" }, { id: "c4", Full_Name: "David Lee", Contact_Type: "Buyer" },
+    { id: "c5", Full_Name: "Rajinder Saini", Contact_Type: "Buyer" }, { id: "c6", Full_Name: "Rajiv Sharma", Contact_Type: "Buyer" }
+  ];
+  var CONTACT_FIELDS = [
+    { api_name: "Full_Name", field_label: "Contact Name", data_type: "text" },
+    { api_name: "Contact_Type", field_label: "Contact Type", data_type: "picklist" }
   ];
 
   function write(isNew, cfg) {
@@ -116,6 +121,7 @@
         getModules: function () { return delay({ modules: [{ api_name: MODULE, plural_label: "SMB Transaction Tracker", singular_label: "SMB Transaction Tracker", module_name: "SMB_Transaction_Tracker" }, { api_name: "Deals", plural_label: "Deals", singular_label: "Deal" }] }); },
         getFields: function (cfg) {
           if (cfg && cfg.Entity === "Deals") return delay({ fields: clone(DEAL_FIELDS) });
+          if (cfg && cfg.Entity === "Contacts") return delay({ fields: clone(CONTACT_FIELDS) });
           return delay({ fields: clone(FIELDS) });
         }
       },

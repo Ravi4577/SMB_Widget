@@ -461,7 +461,8 @@
         var raw = rec[meta.api_name];
         var val = toHeaderValue(raw, kind);
         h.keys[key] = { meta: meta, kind: kind, original: val, current: val, display: displayValue(raw),
-                        lookupModule: kind === "lookup" ? lookupModuleOf(meta) : null };
+                        lookupModule: kind === "lookup" ? lookupModuleOf(meta) : null,
+                        lookupFilter: kind === "lookup" ? (cfg.lookupFilter || null) : null };
         log("header field", key, meta.api_name, meta.data_type, "->", kind);
       });
     }).catch(function (e) {
@@ -909,6 +910,33 @@
   var lookupTimer = null;
   var lookupSeq = 0;
 
+  // Resolves a lookup filter ({ fieldLabel, value }) to the field's API name
+  // in the lookup module. Cached per module + label.
+  var lookupFilterCache = {};
+  function resolveLookupFilter(f) {
+    var lf = f.lookupFilter;
+    if (!lf) return Promise.resolve(null);
+    var key = f.lookupModule + "|" + lf.fieldLabel;
+    if (!lookupFilterCache[key]) {
+      // Only the field's API name is cached; each box applies its own value.
+      lookupFilterCache[key] = CRM.getFields(f.lookupModule).then(function (fields) {
+        var hit = fields.filter(function (x) { return norm(x.field_label) === norm(lf.fieldLabel) || norm(x.api_name) === norm(lf.fieldLabel); })[0];
+        if (!hit) log("lookup filter field", lf.fieldLabel, "not found in", f.lookupModule, "- results are not filtered");
+        return hit ? hit.api_name : null;
+      }, function (e) { log("lookup filter fields failed", e); return null; });
+    }
+    return lookupFilterCache[key].then(function (api) { return api ? { api: api, value: lf.value } : null; });
+  }
+
+  // True when the record's filter field holds the wanted value (picklist,
+  // multi-select array or text).
+  function passesLookupFilter(rec, flt) {
+    if (!flt) return true;
+    var v = rec[flt.api];
+    var list = Array.isArray(v) ? v : (v == null ? [] : String(v).split(";"));
+    return list.some(function (x) { return norm(x && typeof x === "object" ? (x.name || x.display_value) : x) === norm(flt.value); });
+  }
+
   function lookupSearch(input, f) {
     var menu = input.parentNode.querySelector(".lk-menu");
     var text = input.value.trim();
@@ -923,15 +951,23 @@
       var seq = ++lookupSeq;
       menu.hidden = false;
       menu.innerHTML = '<div class="lk-empty">Searching…</div>';
-      ZOHO.CRM.API.searchRecord({ Entity: f.lookupModule, Type: "word", Query: text, page: 1, per_page: 10 })
+      var flt = null;
+      resolveLookupFilter(f)
+        .then(function (resolved) {
+          flt = resolved;
+          // Fetch more than shown, since the filter is applied to the results.
+          return ZOHO.CRM.API.searchRecord({ Entity: f.lookupModule, Type: "word", Query: text, page: 1, per_page: flt ? 100 : 10 });
+        })
         .then(function (r) {
           if (seq !== lookupSeq) return;
-          var rows = (r && Array.isArray(r.data)) ? r.data : [];
+          var rows = ((r && Array.isArray(r.data)) ? r.data : [])
+            .filter(function (rec) { return passesLookupFilter(rec, flt); })
+            .slice(0, 10);
           menu.innerHTML = rows.length
             ? rows.map(function (rec) {
                 return '<div class="lk-item" data-id="' + esc(rec.id) + '">' + esc(recordDisplayName(rec)) + "</div>";
               }).join("")
-            : '<div class="lk-empty">No ' + esc(f.lookupModule) + ' found</div>';
+            : '<div class="lk-empty">No results found</div>';
         }, function (e) {
           if (seq === lookupSeq) menu.innerHTML = '<div class="lk-empty">Search failed: ' + esc(errMsg(e)) + "</div>";
         });
